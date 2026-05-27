@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, 
   Shield, 
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { authApi } from '../api/auth';
+import { settingsApi } from '../api/settings';
 import { cn } from '../utils/cn';
 
 const Settings: React.FC = () => {
@@ -27,6 +28,67 @@ const Settings: React.FC = () => {
     password: '',
     role: 'staff' as 'admin' | 'staff'
   });
+
+  // Store Settings States
+  const [storeSettings, setStoreSettings] = useState({
+    shop_name: '',
+    tax_rate: 0,
+    currency: 'USD',
+    receipt_header: '',
+    receipt_footer: '',
+  });
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  const isAdmin = user?.role === 'admin';
+
+  useEffect(() => {
+    if (activeTab === 'store' && isAdmin) {
+      const fetchSettings = async () => {
+        setIsLoadingSettings(true);
+        setSettingsError(null);
+        try {
+          const res = await settingsApi.get();
+          if (res.success && res.data) {
+            setStoreSettings({
+              shop_name: res.data.shop_name,
+              tax_rate: res.data.tax_rate,
+              currency: res.data.currency,
+              receipt_header: res.data.receipt_header || '',
+              receipt_footer: res.data.receipt_footer || '',
+            });
+          }
+        } catch (err: unknown) {
+          setSettingsError(`Failed to load store settings. ${err instanceof Error ? err.message : ''}`);
+        } finally {
+          setIsLoadingSettings(false);
+        }
+      };
+      fetchSettings();
+    }
+  }, [activeTab, isAdmin]);
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    setSettingsSuccess(null);
+    setSettingsError(null);
+    try {
+      const res = await settingsApi.update(storeSettings);
+      if (res.success) {
+        setSettingsSuccess('Store settings updated successfully!');
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error && 'response' in err 
+        ? (err as { response: { data: { message: string } } }).response?.data?.message 
+        : 'Failed to update store settings.';
+      setSettingsError(message || 'Failed to update store settings.');
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,8 +112,7 @@ const Settings: React.FC = () => {
     }
   };
 
-  const isAdmin = user?.role === 'admin';
-
+  // Tab definition is moved below state declarations to properly reference isAdmin
   const tabs = [
     { id: 'profile', name: 'My Profile', icon: User },
     { id: 'users', name: 'Staff Management', icon: Shield, hidden: !isAdmin },
@@ -224,15 +285,111 @@ const Settings: React.FC = () => {
           )}
 
           {activeTab === 'store' && isAdmin && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 text-center flex flex-col items-center">
-              <Store className="w-16 h-16 text-slate-200 mb-4" />
-              <h3 className="text-xl font-bold text-slate-900 mb-2">General Store Settings</h3>
-              <p className="text-slate-500 max-w-sm mx-auto">
-                Configure your shop name, tax rates, currency, and receipt header/footer messages.
-              </p>
-              <div className="mt-8 px-6 py-2 bg-slate-100 rounded-full text-xs font-bold text-slate-500 uppercase tracking-widest">
-                Feature coming soon
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                    <Store className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900">General Store Settings</h3>
+                </div>
               </div>
+
+              {isLoadingSettings ? (
+                <div className="p-12 flex justify-center items-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                </div>
+              ) : (
+                <form onSubmit={handleSaveSettings} className="p-8 space-y-6">
+                  {settingsSuccess && (
+                    <div className="p-4 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-xl flex items-center gap-3 text-sm font-medium animate-in slide-in-from-top-2 duration-300">
+                      <CheckCircle2 className="w-5 h-5" />
+                      {settingsSuccess}
+                    </div>
+                  )}
+                  {settingsError && (
+                    <div className="p-4 bg-rose-50 border border-rose-100 text-rose-700 rounded-xl flex items-center gap-3 text-sm font-medium animate-in slide-in-from-top-2 duration-300">
+                      <AlertCircle className="w-5 h-5" />
+                      {settingsError}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700">Shop Name</label>
+                      <input
+                        required
+                        type="text"
+                        value={storeSettings.shop_name}
+                        onChange={(e) => setStoreSettings({ ...storeSettings, shop_name: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g. My General Store"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-700">Currency</label>
+                        <select
+                          value={storeSettings.currency}
+                          onChange={(e) => setStoreSettings({ ...storeSettings, currency: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="USD">USD ($)</option>
+                          <option value="IDR">IDR (Rp)</option>
+                          <option value="EUR">EUR (€)</option>
+                          <option value="GBP">GBP (£)</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-700">Tax Rate (%)</label>
+                        <input
+                          required
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={storeSettings.tax_rate}
+                          onChange={(e) => setStoreSettings({ ...storeSettings, tax_rate: parseFloat(e.target.value) || 0 })}
+                          className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="e.g. 10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-700">Receipt Header Message</label>
+                    <textarea
+                      rows={3}
+                      value={storeSettings.receipt_header}
+                      onChange={(e) => setStoreSettings({ ...storeSettings, receipt_header: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Message printed at the top of receipts"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-700">Receipt Footer Message</label>
+                    <textarea
+                      rows={3}
+                      value={storeSettings.receipt_footer}
+                      onChange={(e) => setStoreSettings({ ...storeSettings, receipt_footer: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Message printed at the bottom of receipts"
+                    />
+                  </div>
+
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      disabled={isSavingSettings}
+                      type="submit"
+                      className="w-full md:w-auto bg-blue-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 active:scale-95 disabled:bg-slate-300"
+                    >
+                      {isSavingSettings ? <Loader2 className="w-5 h-5 animate-spin" /> : <Store className="w-5 h-5" />}
+                      Save Store Settings
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           )}
         </div>

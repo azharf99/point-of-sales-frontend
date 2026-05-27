@@ -87,3 +87,14 @@ export interface SalesReport {
   snap_payments: number;
   total_discount: number;
 }
+
+export interface StoreSetting {
+  id: number;
+  shop_name: string;
+  tax_rate: number;
+  currency: string;
+  receipt_header: string;
+  receipt_footer: string;
+  updated_at: string;
+}
+
