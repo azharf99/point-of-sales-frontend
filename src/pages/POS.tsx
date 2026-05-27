@@ -16,12 +16,14 @@ import { productApi } from '../api/products';
 import { transactionApi } from '../api/transactions';
 import type { Product, Category } from '../types';
 import { cn } from '../utils/cn';
+import { useSettingsStore, formatCurrency } from '../store/settingsStore';
 
 interface CartItem extends Product {
   quantity: number;
 }
 
 const POS: React.FC = () => {
+  const { settings, fetchSettings } = useSettingsStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -39,10 +41,14 @@ const POS: React.FC = () => {
     setIsLoading(true);
     try {
       const [productsRes, categoriesRes] = await Promise.all([
-        productApi.getAll(),
+        productApi.getAll(1, 100),
         productApi.getCategories()
       ]);
-      setProducts(productsRes.data || []);
+      if (productsRes.data && 'items' in productsRes.data) {
+        setProducts(productsRes.data.items || []);
+      } else {
+        setProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
+      }
       setCategories(categoriesRes.data || []);
     } catch (err) {
       console.error('Failed to fetch POS data', err);
@@ -53,15 +59,26 @@ const POS: React.FC = () => {
 
   useEffect(() => {
     const init = async () => {
+      if (!settings) {
+        await fetchSettings();
+      }
       await fetchData();
     };
     init();
-  }, []);
+  }, [settings, fetchSettings]);
 
   const addToCart = (product: Product) => {
+    if (product.stock <= 0) {
+      alert(`Product "${product.name}" is out of stock!`);
+      return;
+    }
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === product.id);
       if (existingItem) {
+        if (existingItem.quantity >= product.stock) {
+          alert(`Cannot add more. Only ${product.stock} units available in stock.`);
+          return prevCart;
+        }
         return prevCart.map((item) =>
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
@@ -79,6 +96,10 @@ const POS: React.FC = () => {
       prevCart.map((item) => {
         if (item.id === productId) {
           const newQuantity = Math.max(1, item.quantity + delta);
+          if (newQuantity > item.stock) {
+            alert(`Cannot exceed available stock (${item.stock} units).`);
+            return item;
+          }
           return { ...item, quantity: newQuantity };
         }
         return item;
@@ -101,9 +122,10 @@ const POS: React.FC = () => {
     }
   };
 
+  const taxRate = settings ? settings.tax_rate / 100 : 0.1;
   const subtotal = cart.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
-  const tax = subtotal * 0.1; // 10% tax
-  const total = subtotal + tax - discount;
+  const tax = subtotal * taxRate;
+  const total = Math.max(0, subtotal + tax - discount);
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
@@ -123,7 +145,19 @@ const POS: React.FC = () => {
       
       if (res.success) {
         if (paymentMethod === 'snap' && res.data.payment?.redirect_url) {
-          window.location.href = res.data.payment.redirect_url;
+          try {
+            const url = new URL(res.data.payment.redirect_url);
+            const trustedDomains = ['app.midtrans.com', 'app.sandbox.midtrans.com'];
+            if (trustedDomains.includes(url.hostname)) {
+              window.location.href = res.data.payment.redirect_url;
+            } else {
+              console.error('Insecure redirect URL:', res.data.payment.redirect_url);
+              alert('Error: Insecure payment gateway redirect.');
+            }
+          } catch (err) {
+            console.error('Invalid redirect URL:', err);
+            alert('Error: Invalid payment redirect URL.');
+          }
         } else {
           alert('Transaction successful!');
           setCart([]);
@@ -215,7 +249,7 @@ const POS: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between mt-auto">
                     <span className="text-sm lg:text-lg font-bold text-blue-600">
-                      ${(product.price || 0).toLocaleString()}
+                      {formatCurrency(product.price || 0, settings)}
                     </span>
                     <span className={cn(
                       "text-[9px] lg:text-[10px] px-1.5 lg:px-2 py-0.5 lg:py-1 rounded-md font-bold uppercase tracking-tighter lg:tracking-normal",
@@ -243,7 +277,7 @@ const POS: React.FC = () => {
               {cart.length}
             </span>
           </div>
-          <span className="font-bold pr-1">${total.toLocaleString()}</span>
+          <span className="font-bold pr-1">{formatCurrency(total, settings)}</span>
         </button>
       )}
 
@@ -286,7 +320,7 @@ const POS: React.FC = () => {
               <div key={item.id} className="flex gap-3 lg:gap-4 group">
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-medium text-slate-900 truncate leading-tight mb-0.5">{item.name}</h4>
-                  <p className="text-xs font-bold text-blue-600">${(item.price || 0).toLocaleString()}</p>
+                  <p className="text-xs font-bold text-blue-600">{formatCurrency(item.price || 0, settings)}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <div className="flex items-center bg-slate-100 rounded-lg p-0.5 lg:p-1">
@@ -320,27 +354,39 @@ const POS: React.FC = () => {
           <div className="space-y-2 mb-4 lg:mb-6 text-xs lg:text-sm">
             <div className="flex justify-between text-slate-600">
               <span>Subtotal</span>
-              <span className="font-semibold">${subtotal.toLocaleString()}</span>
+              <span className="font-semibold">{formatCurrency(subtotal, settings)}</span>
             </div>
             <div className="flex justify-between text-slate-600">
-              <span>Tax (10%)</span>
-              <span className="font-semibold">${tax.toLocaleString()}</span>
+              <span>Tax ({settings ? settings.tax_rate : 10}%)</span>
+              <span className="font-semibold">{formatCurrency(tax, settings)}</span>
             </div>
             <div className="flex justify-between text-slate-600 items-center">
               <span>Discount</span>
               <div className="flex items-center gap-1 border-b border-slate-300 focus-within:border-blue-500 transition-colors">
-                <span className="text-[10px] text-slate-400">$</span>
+                <span className="text-[10px] text-slate-400">
+                  {settings?.currency === 'IDR' ? 'Rp' : (settings?.currency === 'EUR' ? '€' : (settings?.currency === 'GBP' ? '£' : '$'))}
+                </span>
                 <input 
                   type="number"
+                  min="0"
+                  max={subtotal}
                   value={discount}
-                  onChange={(e) => setDiscount(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Math.max(0, Number(e.target.value));
+                    if (val > subtotal) {
+                      alert("Discount cannot exceed subtotal.");
+                      setDiscount(subtotal);
+                    } else {
+                      setDiscount(val);
+                    }
+                  }}
                   className="w-16 text-right bg-transparent focus:outline-none py-0.5 font-bold"
                 />
               </div>
             </div>
             <div className="flex justify-between text-lg lg:text-xl font-bold text-slate-900 pt-3 lg:pt-4 border-t border-slate-200 mt-2">
               <span>Total</span>
-              <span className="text-blue-600">${total.toLocaleString()}</span>
+              <span className="text-blue-600">{formatCurrency(total, settings)}</span>
             </div>
           </div>
 

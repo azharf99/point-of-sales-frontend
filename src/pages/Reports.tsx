@@ -14,8 +14,10 @@ import {
 import { reportApi } from '../api/reports';
 import type { SalesReport } from '../types';
 import { cn } from '../utils/cn';
+import { useSettingsStore, formatCurrency } from '../store/settingsStore';
 
 const Reports: React.FC = () => {
+  const { settings, fetchSettings } = useSettingsStore();
   const today = new Date().toISOString().split('T')[0];
   const [dateRange, setDateRange] = useState({ start: today, end: today });
   const [report, setReport] = useState<SalesReport | null>(null);
@@ -35,15 +37,18 @@ const Reports: React.FC = () => {
 
   useEffect(() => {
     const init = async () => {
+      if (!settings) {
+        await fetchSettings();
+      }
       await fetchReport();
     };
     init();
-  }, [fetchReport]);
+  }, [fetchReport, settings, fetchSettings]);
 
   const stats = [
     { 
       label: 'Gross Revenue', 
-      value: `Rp ${report?.total_sales?.toLocaleString('id-ID') || '0'}`, 
+      value: formatCurrency(report?.total_sales || 0, settings), 
       icon: DollarSign, 
       color: 'text-emerald-600', 
       bg: 'bg-emerald-50',
@@ -61,7 +66,7 @@ const Reports: React.FC = () => {
     },
     { 
       label: 'Avg. Transaction', 
-      value: `Rp ${report?.average_order_value?.toLocaleString('id-ID') || '0'}`, 
+      value: formatCurrency(report?.average_order_value || 0, settings), 
       icon: BarChart3, 
       color: 'text-violet-600', 
       bg: 'bg-violet-50',
@@ -166,7 +171,7 @@ const Reports: React.FC = () => {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-bold text-slate-900 text-lg">Rp {(item.total_sales || 0).toLocaleString('id-ID')}</p>
+                    <p className="font-bold text-slate-900 text-lg">{formatCurrency(item.total_sales || 0, settings)}</p>
                     <div className="w-24 sm:w-32 h-2 bg-slate-100 rounded-full mt-2 overflow-hidden">
                       <div 
                         className="h-full bg-blue-600 rounded-full transition-all duration-1000" 
@@ -193,15 +198,15 @@ const Reports: React.FC = () => {
             <div className="space-y-4">
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
                 <p className="text-xs font-bold text-slate-500 uppercase mb-1">Cash Payments</p>
-                <p className="text-xl font-bold text-slate-900">Rp {report?.cash_payments?.toLocaleString('id-ID') || '0'}</p>
+                <p className="text-xl font-bold text-slate-900">{formatCurrency(report?.cash_payments || 0, settings)}</p>
               </div>
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
                 <p className="text-xs font-bold text-slate-500 uppercase mb-1">Snap Payments</p>
-                <p className="text-xl font-bold text-slate-900">Rp {report?.snap_payments?.toLocaleString('id-ID') || '0'}</p>
+                <p className="text-xl font-bold text-slate-900">{formatCurrency(report?.snap_payments || 0, settings)}</p>
               </div>
               <div className="p-4 rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-100">
                 <p className="text-xs font-bold opacity-80 uppercase mb-1">Total Discount Given</p>
-                <p className="text-xl font-bold">Rp {report?.total_discount?.toLocaleString('id-ID') || '0'}</p>
+                <p className="text-xl font-bold">{formatCurrency(report?.total_discount || 0, settings)}</p>
               </div>
             </div>
           </div>

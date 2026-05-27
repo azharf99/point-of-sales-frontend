@@ -13,6 +13,7 @@ export interface ApiError {
 export interface LoginCredentials {
   username: string;
   password?: string;
+  recaptcha_token?: string;
 }
 
 export interface User {

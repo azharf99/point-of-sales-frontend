@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { useAuthStore } from '../store/authStore';
 
-// Helper to extract a cookie value by name (Exact implementation from @FRONTEND.md)
+// Helper to extract a cookie value by name
 const getCookie = (name: string): string | null | undefined => {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
@@ -13,12 +14,11 @@ const getCookie = (name: string): string | null | undefined => {
 
 // Create Axios Instance
 export const api = axios.create({
-  // Aligning default with documentation fallback
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api',
   withCredentials: true, // Crucial for CORS and Cookie transmission
 });
 
-// Request Interceptor: Inject CSRF Token and JWT (Exact logic from @FRONTEND.md)
+// Request Interceptor: Inject CSRF Token
 api.interceptors.request.use((config) => {
   // 1. Double-Submit CSRF Token
   const csrfToken = getCookie('csrf_token');
@@ -26,10 +26,9 @@ api.interceptors.request.use((config) => {
     config.headers['X-CSRF-Token'] = csrfToken;
   }
 
-  // 2. JWT Bearer Token
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers['Authorization'] = `Bearer ${token}`;
+  // 2. HTTP fallback check for security
+  if (import.meta.env.PROD && config.baseURL && !config.baseURL.startsWith('https://')) {
+    console.error('Security Alert: Insecure API base URL in production!');
   }
 
   return config;
@@ -37,15 +36,70 @@ api.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
-// Response Interceptor: Handle global errors
+interface QueueItem {
+  resolve: (value: unknown) => void;
+  reject: (reason: unknown) => void;
+}
+
+let isRefreshing = false;
+let failedQueue: QueueItem[] = [];
+
+const processQueue = (error: unknown, token: string | null = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
+// Response Interceptor: Handle global errors and automatic token refresh
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // Session expiration handling
-    if (error.response?.status === 401 && !window.location.pathname.includes('/login')) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Handle 401 Unauthorized errors and attempt token refresh
+    if (
+      error.response?.status === 401 && 
+      !originalRequest._retry && 
+      !originalRequest.url?.includes('/auth/login') && 
+      !originalRequest.url?.includes('/auth/refresh')
+    ) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then(() => {
+            return api(originalRequest);
+          })
+          .catch((err) => {
+            return Promise.reject(err);
+          });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        await api.post('/auth/refresh'); // Sets new access and refresh token cookies
+        isRefreshing = false;
+        processQueue(null);
+        return api(originalRequest);
+      } catch (refreshError) {
+        isRefreshing = false;
+        processQueue(refreshError);
+        // Clear state and redirect to login
+        useAuthStore.getState().clearAuth();
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
+        return Promise.reject(refreshError);
+      }
     }
+
     return Promise.reject(error);
   }
 );

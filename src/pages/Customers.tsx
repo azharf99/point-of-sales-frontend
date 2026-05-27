@@ -8,23 +8,39 @@ import {
   Trophy,
   Loader2,
   X,
-  Save
+  Save,
+  Trash2
 } from 'lucide-react';
 import { customerApi } from '../api/customers';
+import { useAuthStore } from '../store/authStore';
+import { cn } from '../utils/cn';
 import type { Customer } from '../types';
 
 const Customers: React.FC = () => {
+  const { user } = useAuthStore();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Partial<Customer> | null>(null);
 
-  const fetchCustomers = async () => {
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
+  const fetchCustomers = async (page = 1) => {
     setIsLoading(true);
     try {
-      const res = await customerApi.getAll();
-      setCustomers(res.data || []);
+      const res = await customerApi.getAll(page, 15);
+      if (res.data && 'items' in res.data) {
+        setCustomers(res.data.items || []);
+        setCurrentPage(res.data.meta.page);
+        setTotalPages(res.data.meta.total_pages);
+        setTotalItems(res.data.meta.total);
+      } else {
+        setCustomers(Array.isArray(res.data) ? res.data : []);
+      }
     } catch (err) {
       console.error('Failed to fetch customers', err);
     } finally {
@@ -33,15 +49,35 @@ const Customers: React.FC = () => {
   };
 
   useEffect(() => {
-    const init = async () => {
-      await fetchCustomers();
+    let active = true;
+    const load = async () => {
+      await Promise.resolve();
+      if (active) {
+        fetchCustomers(currentPage);
+      }
     };
-    init();
-  }, []);
+    load();
+    return () => {
+      active = false;
+    };
+  }, [currentPage]);
+
+
 
   const handleEdit = (customer: Customer) => {
     setSelectedCustomer(customer);
     setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this customer?')) return;
+    try {
+      await customerApi.delete(id);
+      fetchCustomers();
+    } catch (err) {
+      console.error('Failed to delete customer', err);
+      alert('Failed to delete customer.');
+    }
   };
 
   const handleAdd = () => {
@@ -164,6 +200,14 @@ const Customers: React.FC = () => {
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
+                      {user?.role === 'admin' && (
+                        <button 
+                          onClick={() => handleDelete(customer.id)}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all ml-1"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -171,6 +215,52 @@ const Customers: React.FC = () => {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination Footer */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50">
+            <p className="text-xs font-semibold text-slate-500">
+              Showing page <span className="text-slate-900 font-bold">{currentPage}</span> of <span className="text-slate-900 font-bold">{totalPages}</span> ({totalItems} total customers)
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white transition-all"
+              >
+                Previous
+              </button>
+              {(() => {
+                const pages: number[] = [];
+                const range = 2;
+                for (let i = Math.max(1, currentPage - range); i <= Math.min(totalPages, currentPage + range); i++) {
+                  pages.push(i);
+                }
+                return pages;
+              })().map(page => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={cn(
+                    "w-8 h-8 rounded-xl text-xs font-bold flex items-center justify-center transition-all",
+                    page === currentPage
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-100"
+                      : "border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
+                  )}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white transition-all"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Customer Modal */}

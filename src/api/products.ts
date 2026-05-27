@@ -2,8 +2,10 @@ import { api } from './api';
 import type { ApiResponse, Product, Category } from '../types';
 
 export const productApi = {
-  getAll: async () => {
-    const response = await api.get<ApiResponse<Product[]>>('/products');
+  getAll: async (page = 1, limit = 15) => {
+    const response = await api.get<ApiResponse<{ items: Product[]; meta: { total: number; page: number; limit: number; total_pages: number } }>>('/products', {
+      params: { page, limit }
+    });
     return response.data;
   },
   getById: async (id: number) => {
@@ -18,12 +20,16 @@ export const productApi = {
     const response = await api.put<ApiResponse<Product>>(`/products/${id}`, data);
     return response.data;
   },
+  delete: async (id: number) => {
+    const response = await api.delete<ApiResponse<null>>(`/products/${id}`);
+    return response.data;
+  },
   getLowStock: async () => {
     const response = await api.get<ApiResponse<Product[]>>('/products/low-stock');
     return response.data;
   },
   lookup: async (code: string) => {
-    const response = await api.get<ApiResponse<Product>>(`/products/lookup?code=${code}`);
+    const response = await api.get<ApiResponse<Product>>(`/products/lookup?code=${encodeURIComponent(code)}`);
     return response.data;
   },
   getCategories: async () => {

@@ -12,19 +12,35 @@ import {
   Save,
   Tag,
   DollarSign,
-  FolderTree
+  FolderTree,
+  Trash2
 } from 'lucide-react';
 import { productApi } from '../api/products';
+import { useAuthStore } from '../store/authStore';
 import type { Product, Category } from '../types';
 import { cn } from '../utils/cn';
+import { useSettingsStore, formatCurrency } from '../store/settingsStore';
 
 const Products: React.FC = () => {
+  const { user } = useAuthStore();
+  const { settings } = useSettingsStore();
   const [activeTab, setActiveTab] = useState<'products' | 'categories'>('products');
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Product Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [lowStockCount, setLowStockCount] = useState(0);
+
+  // Category Pagination State
+  const [categoryPage, setCategoryPage] = useState(1);
+  const categoryLimit = 15;
+  const [allProductsForCount, setAllProductsForCount] = useState<Product[]>([]);
+
   // Product Modal State
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
@@ -35,27 +51,92 @@ const Products: React.FC = () => {
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Partial<Category> | null>(null);
 
-  const fetchData = async () => {
+  const fetchProducts = async (page = 1) => {
     setIsLoading(true);
     try {
-      const [productsRes, categoriesRes] = await Promise.all([
-        productApi.getAll(),
-        productApi.getCategories()
-      ]);
-      setProducts(productsRes.data || []);
-      setCategories(categoriesRes.data || []);
+      const res = await productApi.getAll(page, 15);
+      if (res.data && 'items' in res.data) {
+        setProducts(res.data.items || []);
+        setCurrentPage(res.data.meta.page);
+        setTotalPages(res.data.meta.total_pages);
+        setTotalItems(res.data.meta.total);
+      } else {
+        setProducts(Array.isArray(res.data) ? res.data : []);
+      }
     } catch (err) {
-      console.error('Failed to fetch data', err);
+      console.error('Failed to fetch products', err);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const [catRes, prodRes] = await Promise.all([
+        productApi.getCategories(),
+        productApi.getAll(1, 1000)
+      ]);
+      setCategories(catRes.data || []);
+      if (prodRes.data && 'items' in prodRes.data) {
+        setAllProductsForCount(prodRes.data.items || []);
+      } else {
+        setAllProductsForCount(Array.isArray(prodRes.data) ? prodRes.data : []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch categories', err);
+    }
+  };
+
+  const fetchLowStockCount = async () => {
+    try {
+      const res = await productApi.getLowStock();
+      setLowStockCount(res.data?.length || 0);
+    } catch (err) {
+      console.error('Failed to fetch low stock count', err);
+    }
+  };
+
+  const handleDeleteProduct = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    try {
+      await productApi.delete(id);
+      await Promise.all([
+        fetchProducts(currentPage),
+        fetchLowStockCount()
+      ]);
+    } catch (err) {
+      console.error('Failed to delete product', err);
+      alert('Failed to delete product.');
+    }
+  };
+
   useEffect(() => {
-    const init = async () => {
-      await fetchData();
+    let active = true;
+    const load = async () => {
+      await Promise.resolve();
+      if (active) {
+        fetchProducts(currentPage);
+      }
     };
-    init();
+    load();
+    return () => {
+      active = false;
+    };
+  }, [currentPage]);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      await Promise.resolve();
+      if (active) {
+        fetchCategories();
+        fetchLowStockCount();
+      }
+    };
+    load();
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Product Actions
@@ -90,7 +171,10 @@ const Products: React.FC = () => {
         await productApi.create(selectedProduct);
       }
       setIsProductModalOpen(false);
-      fetchData();
+      await Promise.all([
+        fetchProducts(currentPage),
+        fetchLowStockCount()
+      ]);
     } catch (err) {
       console.error('Failed to save product', err);
     } finally {
@@ -117,7 +201,7 @@ const Products: React.FC = () => {
     try {
       await productApi.createCategory(selectedCategory);
       setIsCategoryModalOpen(false);
-      fetchData();
+      fetchCategories();
     } catch (err) {
       console.error('Failed to save category', err);
     } finally {
@@ -156,6 +240,12 @@ const Products: React.FC = () => {
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const totalCategoryPages = Math.max(1, Math.ceil(filteredCategories.length / categoryLimit));
+  const paginatedCategories = filteredCategories.slice(
+    (categoryPage - 1) * categoryLimit,
+    categoryPage * categoryLimit
+  );
+
   return (
     <div className="space-y-6 lg:space-y-8 pb-10">
       {/* Stats Row */}
@@ -166,7 +256,7 @@ const Products: React.FC = () => {
           </div>
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Items</p>
-            <p className="text-2xl font-bold text-slate-900">{products.length}</p>
+            <p className="text-2xl font-bold text-slate-900">{totalItems}</p>
           </div>
         </div>
         
@@ -176,9 +266,7 @@ const Products: React.FC = () => {
           </div>
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Low Stock</p>
-            <p className="text-2xl font-bold text-slate-900">
-              {products.filter(p => p.stock > 0 && p.stock <= p.min_stock).length}
-            </p>
+            <p className="text-2xl font-bold text-slate-900">{lowStockCount}</p>
           </div>
         </div>
 
@@ -274,7 +362,7 @@ const Products: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 lg:px-6 py-4">
-                        <p className="font-bold text-slate-900 text-sm">${(product.price || 0).toLocaleString()}</p>
+                        <p className="font-bold text-slate-900 text-sm">{formatCurrency(product.price || 0, settings)}</p>
                         <p className="text-[10px] font-medium text-blue-600">{product.stock} units</p>
                       </td>
                       <td className="px-4 lg:px-6 py-4">
@@ -284,6 +372,11 @@ const Products: React.FC = () => {
                         <button onClick={() => handleEditProduct(product)} className="p-1.5 lg:p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
                           <Edit2 className="w-3.5 lg:w-4 h-3.5 lg:h-4" />
                         </button>
+                        {user?.role === 'admin' && (
+                          <button onClick={() => handleDeleteProduct(product.id)} className="p-1.5 lg:p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all ml-1">
+                            <Trash2 className="w-3.5 lg:w-4 h-3.5 lg:h-4" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -302,10 +395,10 @@ const Products: React.FC = () => {
               <tbody className="divide-y divide-slate-100">
                 {isLoading ? (
                   <tr><td colSpan={3} className="px-6 py-12 text-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" /></td></tr>
-                ) : filteredCategories.length === 0 ? (
+                ) : paginatedCategories.length === 0 ? (
                   <tr><td colSpan={3} className="px-6 py-12 text-center text-slate-400 italic">No categories found.</td></tr>
                 ) : (
-                  filteredCategories.map((cat) => (
+                  paginatedCategories.map((cat) => (
                     <tr key={cat.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-4 lg:px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -317,7 +410,7 @@ const Products: React.FC = () => {
                       </td>
                       <td className="px-4 lg:px-6 py-4 text-center">
                         <span className="text-xs font-bold text-slate-400">
-                          {products.filter(p => p.category_id === cat.id).length} products
+                          {allProductsForCount.filter(p => p.category_id === cat.id).length} products
                         </span>
                       </td>
                       <td className="px-4 lg:px-6 py-4 text-right">
@@ -332,6 +425,97 @@ const Products: React.FC = () => {
             </table>
           )}
         </div>
+
+        {/* Pagination Footers */}
+        {activeTab === 'products' && totalPages > 1 && (
+          <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50">
+            <p className="text-xs font-semibold text-slate-500">
+              Showing page <span className="text-slate-900 font-bold">{currentPage}</span> of <span className="text-slate-900 font-bold">{totalPages}</span> ({totalItems} total products)
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white transition-all animate-in"
+              >
+                Previous
+              </button>
+              {(() => {
+                const pages: number[] = [];
+                const range = 2;
+                for (let i = Math.max(1, currentPage - range); i <= Math.min(totalPages, currentPage + range); i++) {
+                  pages.push(i);
+                }
+                return pages;
+              })().map(page => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={cn(
+                    "w-8 h-8 rounded-xl text-xs font-bold flex items-center justify-center transition-all",
+                    page === currentPage
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-100"
+                      : "border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
+                  )}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white transition-all"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'categories' && totalCategoryPages > 1 && (
+          <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50">
+            <p className="text-xs font-semibold text-slate-500">
+              Showing page <span className="text-slate-900 font-bold">{categoryPage}</span> of <span className="text-slate-900 font-bold">{totalCategoryPages}</span> ({filteredCategories.length} total categories)
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCategoryPage(prev => Math.max(prev - 1, 1))}
+                disabled={categoryPage === 1}
+                className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white transition-all"
+              >
+                Previous
+              </button>
+              {(() => {
+                const pages: number[] = [];
+                const range = 2;
+                for (let i = Math.max(1, categoryPage - range); i <= Math.min(totalCategoryPages, categoryPage + range); i++) {
+                  pages.push(i);
+                }
+                return pages;
+              })().map(page => (
+                <button
+                  key={page}
+                  onClick={() => setCategoryPage(page)}
+                  className={cn(
+                    "w-8 h-8 rounded-xl text-xs font-bold flex items-center justify-center transition-all",
+                    page === categoryPage
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-100"
+                      : "border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
+                  )}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                onClick={() => setCategoryPage(prev => Math.min(prev + 1, totalCategoryPages))}
+                disabled={categoryPage === totalCategoryPages}
+                className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white transition-all"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Product Modal */}

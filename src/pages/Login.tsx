@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShoppingCart, Loader2 } from 'lucide-react';
 import { authApi } from '../api/auth';
 import { useAuthStore } from '../store/authStore';
+import { useSettingsStore } from '../store/settingsStore';
 
 const loginSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),
@@ -32,18 +33,31 @@ const Login: React.FC = () => {
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     setError(null);
+
+    const win = window as Window & { grecaptcha?: { getResponse: () => string; reset: () => void } };
+    const recaptchaToken = win.grecaptcha?.getResponse();
+    if (!recaptchaToken) {
+      setError('Please verify that you are not a robot.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await authApi.login({
         username: data.username,
         password: data.password,
+        recaptcha_token: recaptchaToken,
       });
       if (response.success) {
-        setAuth(response.data.user, response.data.token);
+        setAuth(response.data.user);
+        useSettingsStore.getState().fetchSettings();
         navigate('/');
       } else {
+        win.grecaptcha?.reset();
         setError(response.message);
       }
     } catch (err: unknown) {
+      win.grecaptcha?.reset();
       const message = err instanceof Error && 'response' in err 
         ? (err as { response: { data: { message: string } } }).response?.data?.message 
         : 'Failed to login. Please check your credentials.';
@@ -148,6 +162,14 @@ const Login: React.FC = () => {
               <label htmlFor="remember" className="ml-2 block text-sm text-slate-600">
                 Remember me
               </label>
+            </div>
+
+            {/* reCAPTCHA v2 Challenge */}
+            <div className="flex justify-center my-2">
+              <div 
+                className="g-recaptcha" 
+                data-sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6Le9yP4sAAAAAABWQV9idh2L9iGZzI7SJvhm5SdU"}
+              ></div>
             </div>
 
             <button

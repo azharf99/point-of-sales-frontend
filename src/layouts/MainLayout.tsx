@@ -13,6 +13,7 @@ import {
   X
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { authApi } from '../api/auth';
 import { cn } from '../utils/cn';
 
 interface MainLayoutProps {
@@ -69,7 +70,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } catch (err) {
+      console.error('Failed to log out on server:', err);
+    }
     clearAuth();
     navigate('/login');
   };

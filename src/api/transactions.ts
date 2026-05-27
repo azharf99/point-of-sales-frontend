@@ -14,4 +14,10 @@ export const transactionApi = {
     const response = await api.get<ApiResponse<{ raw_esc_pos: string; metadata: Record<string, unknown> }>>(`/transactions/${id}/print`);
     return response.data;
   },
+  getAll: async (page = 1, limit = 15) => {
+    const response = await api.get<ApiResponse<{ items: Transaction[]; meta: { total: number; page: number; limit: number; total_pages: number } }>>('/transactions', {
+      params: { page, limit }
+    });
+    return response.data;
+  },
 };

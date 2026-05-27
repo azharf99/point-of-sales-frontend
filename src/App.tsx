@@ -18,6 +18,8 @@ import Settings from './pages/Settings';
 
 import { Loader2 } from 'lucide-react';
 
+import { useSettingsStore } from './store/settingsStore';
+
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isInitializing } = useAuthStore();
@@ -40,29 +42,51 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <MainLayout>{children}</MainLayout>;
 };
 
+// Public Route Component (Redirects authenticated users)
+const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, isInitializing } = useAuthStore();
+
+  if (isInitializing) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-slate-50">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+type SetAuthType = (user: { id: number; name: string; username: string; role: 'admin' | 'staff' }) => void;
+
 function App() {
-  const { setAuth, clearAuth, setInitializing } = useAuthStore();
+  const setAuth = useAuthStore((state) => state.setAuth) as SetAuthType;
+  const clearAuth = useAuthStore((state) => state.clearAuth);
+  const setInitializing = useAuthStore((state) => state.setInitializing);
 
   useEffect(() => {
     // Initial handshake to set CSRF cookie and restore session
     const initApp = async () => {
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        setInitializing(false);
-        return;
-      }
-
       try {
+        // 1. Handshake to set CSRF cookie
+        await authApi.handshake();
+        
+        // 2. Retrieve profile to restore session if cookie is present
         const res = await authApi.getProfile();
-        if (res.success) {
-          setAuth(res.data, token);
+        if (res.success && res.data) {
+          setAuth(res.data);
+          useSettingsStore.getState().fetchSettings();
         } else {
           clearAuth();
         }
       } catch {
-        // Only clear if we actually had a token but it's now invalid
         clearAuth();
+      } finally {
+        setInitializing(false);
       }
     };
     initApp();
@@ -73,9 +97,11 @@ function App() {
       <Routes>
         {/* Auth Routes */}
         <Route path="/login" element={
-          <AuthLayout>
-            <Login />
-          </AuthLayout>
+          <PublicRoute>
+            <AuthLayout>
+              <Login />
+            </AuthLayout>
+          </PublicRoute>
         } />
 
         {/* Protected Routes */}
