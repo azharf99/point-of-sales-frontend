@@ -14,7 +14,7 @@ const getCookie = (name: string): string | null | undefined => {
 // Create Axios Instance
 export const api = axios.create({
   // Aligning default with documentation fallback
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api',
   withCredentials: true, // Crucial for CORS and Cookie transmission
 });
 

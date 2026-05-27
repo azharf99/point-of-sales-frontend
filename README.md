@@ -38,7 +38,7 @@ A professional and modern Point of Sale (POS) frontend built with React, Vite, a
    ```
 3. Configure environment variables in `.env`:
    ```env
-   VITE_API_URL=http://localhost:8080/api/v1
+   VITE_API_URL=http://localhost:8080/api
    ```
 4. Start the development server:
    ```bash
