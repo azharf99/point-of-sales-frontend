@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { productApi } from '../api/products';
 import { transactionApi } from '../api/transactions';
-import type { Product } from '../types';
+import type { Product, Category } from '../types';
 import { cn } from '../utils/cn';
 
 interface CartItem extends Product {
@@ -23,7 +23,7 @@ interface CartItem extends Product {
 
 const POS: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -34,10 +34,6 @@ const POS: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -54,6 +50,13 @@ const POS: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const init = async () => {
+      await fetchData();
+    };
+    init();
+  }, []);
 
   const addToCart = (product: Product) => {
     setCart((prevCart) => {

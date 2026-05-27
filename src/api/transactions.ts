@@ -2,7 +2,7 @@ import { api } from './api';
 import type { ApiResponse, Transaction } from '../types';
 
 export const transactionApi = {
-  create: async (data: any) => {
+  create: async (data: { customer_id?: number; items: { product_id: number; quantity: number }[]; payment_method: string }) => {
     const response = await api.post<ApiResponse<Transaction & { payment?: { redirect_url: string } }>>('/transactions', data);
     return response.data;
   },
@@ -11,7 +11,7 @@ export const transactionApi = {
     return response.data;
   },
   getPrintData: async (id: number) => {
-    const response = await api.get<ApiResponse<{ raw_esc_pos: string; metadata: any }>>(`/transactions/${id}/print`);
+    const response = await api.get<ApiResponse<{ raw_esc_pos: string; metadata: Record<string, unknown> }>>(`/transactions/${id}/print`);
     return response.data;
   },
 };

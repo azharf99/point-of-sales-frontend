@@ -1,8 +1,8 @@
 import { api } from './api';
-import type { ApiResponse, User } from '../types';
+import type { ApiResponse, User, LoginCredentials } from '../types';
 
 export const authApi = {
-  login: async (credentials: any) => {
+  login: async (credentials: LoginCredentials) => {
     const response = await api.post<ApiResponse<{ user: User; token: string }>>('/auth/login', credentials);
     return response.data;
   },
@@ -10,7 +10,7 @@ export const authApi = {
     const response = await api.get<ApiResponse<User>>('/auth/profile');
     return response.data;
   },
-  register: async (data: any) => {
+  register: async (data: Partial<User> & { password?: string }) => {
     const response = await api.post<ApiResponse<User>>('/auth/register', data);
     return response.data;
   },

@@ -35,10 +35,6 @@ const Products: React.FC = () => {
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Partial<Category> | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     setIsLoading(true);
     try {
@@ -54,6 +50,13 @@ const Products: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const init = async () => {
+      await fetchData();
+    };
+    init();
+  }, []);
 
   // Product Actions
   const handleEditProduct = (product: Product) => {

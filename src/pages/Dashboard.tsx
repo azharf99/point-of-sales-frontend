@@ -16,10 +16,6 @@ const Dashboard: React.FC = () => {
   const [report, setReport] = useState<SalesReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    fetchReport();
-  }, []);
-
   const fetchReport = async () => {
     setIsLoading(true);
     try {
@@ -32,6 +28,13 @@ const Dashboard: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const init = async () => {
+      await fetchReport();
+    };
+    init();
+  }, []);
 
   const stats = [
     { 
@@ -124,11 +127,11 @@ const Dashboard: React.FC = () => {
                     {i + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-slate-900 truncate leading-tight mb-0.5">{item.name}</p>
-                    <p className="text-xs text-slate-500">{item.quantity} units sold</p>
+                    <p className="font-bold text-slate-900 truncate leading-tight mb-0.5">{item.product_name}</p>
+                    <p className="text-xs text-slate-500">{item.total_quantity} units sold</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-bold text-slate-900">${(item.revenue || 0).toLocaleString()}</p>
+                    <p className="font-bold text-slate-900">${(item.total_sales || 0).toLocaleString()}</p>
                     <div className="w-16 sm:w-24 h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
                       <div 
                         className="h-full bg-blue-600 rounded-full transition-all duration-1000" 

@@ -30,7 +30,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
           } else {
             clearAuth();
           }
-        } catch (err) {
+        } catch {
           clearAuth();
         }
       }
@@ -56,7 +56,7 @@ function App() {
         if (res.success && localStorage.getItem('token')) {
           setAuth(res.data, localStorage.getItem('token')!);
         }
-      } catch (err) {
+      } catch {
         // Only clear if we actually had a token but it's now invalid
         if (localStorage.getItem('token')) {
           clearAuth();

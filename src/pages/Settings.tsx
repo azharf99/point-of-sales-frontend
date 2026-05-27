@@ -40,8 +40,11 @@ const Settings: React.FC = () => {
         setRegisterSuccess(`Account for ${res.data.name} created successfully!`);
         setRegisterForm({ name: '', username: '', password: '', role: 'staff' });
       }
-    } catch (err: any) {
-      setRegisterError(err.response?.data?.message || 'Failed to create account.');
+    } catch (err: unknown) {
+      const message = err instanceof Error && 'response' in err 
+        ? (err as { response: { data: { message: string } } }).response?.data?.message 
+        : 'Failed to create account.';
+      setRegisterError(message || 'Failed to create account.');
     } finally {
       setIsRegistering(false);
     }
@@ -69,7 +72,7 @@ const Settings: React.FC = () => {
             {tabs.filter(t => !t.hidden).map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as 'profile' | 'users' | 'store')}
                 className={cn(
                   "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap lg:w-full",
                   activeTab === tab.id 
@@ -196,7 +199,7 @@ const Settings: React.FC = () => {
                       </label>
                       <select
                         value={registerForm.role}
-                        onChange={(e) => setRegisterForm({ ...registerForm, role: e.target.value as any })}
+                        onChange={(e) => setRegisterForm({ ...registerForm, role: e.target.value as 'admin' | 'staff' })}
                         className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="staff">Staff (Standard POS)</option>

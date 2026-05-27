@@ -21,11 +21,7 @@ const Reports: React.FC = () => {
   const [report, setReport] = useState<SalesReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    fetchReport();
-  }, [dateRange]);
-
-  const fetchReport = async () => {
+  const fetchReport = React.useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await reportApi.getSales(dateRange.start, dateRange.end);
@@ -35,7 +31,14 @@ const Reports: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [dateRange.start, dateRange.end]);
+
+  useEffect(() => {
+    const init = async () => {
+      await fetchReport();
+    };
+    init();
+  }, [fetchReport]);
 
   const stats = [
     { 

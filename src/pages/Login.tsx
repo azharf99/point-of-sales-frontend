@@ -43,8 +43,11 @@ const Login: React.FC = () => {
       } else {
         setError(response.message);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to login. Please check your credentials.');
+    } catch (err: unknown) {
+      const message = err instanceof Error && 'response' in err 
+        ? (err as { response: { data: { message: string } } }).response?.data?.message 
+        : 'Failed to login. Please check your credentials.';
+      setError(message || 'Failed to login. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }

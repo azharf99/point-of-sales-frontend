@@ -10,11 +10,11 @@ export const productApi = {
     const response = await api.get<ApiResponse<Product>>(`/products/${id}`);
     return response.data;
   },
-  create: async (data: any) => {
+  create: async (data: Partial<Product>) => {
     const response = await api.post<ApiResponse<Product>>('/products', data);
     return response.data;
   },
-  update: async (id: number, data: any) => {
+  update: async (id: number, data: Partial<Product>) => {
     const response = await api.put<ApiResponse<Product>>(`/products/${id}`, data);
     return response.data;
   },
@@ -30,7 +30,7 @@ export const productApi = {
     const response = await api.get<ApiResponse<Category[]>>('/products/categories');
     return response.data;
   },
-  createCategory: async (data: any) => {
+  createCategory: async (data: Partial<Category>) => {
     const response = await api.post<ApiResponse<Category>>('/products/categories', data);
     return response.data;
   },

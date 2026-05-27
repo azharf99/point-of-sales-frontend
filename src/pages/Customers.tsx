@@ -20,10 +20,6 @@ const Customers: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Partial<Customer> | null>(null);
 
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
-
   const fetchCustomers = async () => {
     setIsLoading(true);
     try {
@@ -35,6 +31,13 @@ const Customers: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const init = async () => {
+      await fetchCustomers();
+    };
+    init();
+  }, []);
 
   const handleEdit = (customer: Customer) => {
     setSelectedCustomer(customer);

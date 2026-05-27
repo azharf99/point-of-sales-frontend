@@ -7,7 +7,12 @@ export interface ApiResponse<T> {
 export interface ApiError {
   success: boolean;
   message: string;
-  errors?: any;
+  errors?: Record<string, string[]>;
+}
+
+export interface LoginCredentials {
+  username: string;
+  password?: string;
 }
 
 export interface User {
@@ -74,7 +79,10 @@ export interface SalesReport {
     product_name: string;
     total_quantity: number;
     total_sales: number;
+    revenue: number;
   }>;
+  order_volume: number;
+  average_ticket: number;
   cash_payments: number;
   snap_payments: number;
   total_discount: number;
