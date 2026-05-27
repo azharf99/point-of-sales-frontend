@@ -37,7 +37,7 @@ const Settings: React.FC = () => {
     try {
       const res = await authApi.register(registerForm);
       if (res.success) {
-        setRegisterSuccess(`Account for ${res.data.name} created successfully!`);
+        setRegisterSuccess(`Account for ${res.data?.name || 'user'} created successfully!`);
         setRegisterForm({ name: '', username: '', password: '', role: 'staff' });
       }
     } catch (err: unknown) {

@@ -42,8 +42,8 @@ const POS: React.FC = () => {
         productApi.getAll(),
         productApi.getCategories()
       ]);
-      setProducts(productsRes.data);
-      setCategories(categoriesRes.data);
+      setProducts(productsRes.data || []);
+      setCategories(categoriesRes.data || []);
     } catch (err) {
       console.error('Failed to fetch POS data', err);
     } finally {

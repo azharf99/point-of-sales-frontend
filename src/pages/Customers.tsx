@@ -24,7 +24,7 @@ const Customers: React.FC = () => {
     setIsLoading(true);
     try {
       const res = await customerApi.getAll();
-      setCustomers(res.data);
+      setCustomers(res.data || []);
     } catch (err) {
       console.error('Failed to fetch customers', err);
     } finally {
