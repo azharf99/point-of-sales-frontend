@@ -42,7 +42,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     // Session expiration handling
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !window.location.pathname.includes('/login')) {
       localStorage.removeItem('token');
       window.location.href = '/login';
     }

@@ -16,29 +16,24 @@ import Customers from './pages/Customers';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 
+import { Loader2 } from 'lucide-react';
+
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { setAuth, clearAuth } = useAuthStore();
-  
-  useEffect(() => {
-    const checkAuth = async () => {
-      if (localStorage.getItem('token')) {
-        try {
-          const res = await authApi.getProfile();
-          if (res.success) {
-            setAuth(res.data, localStorage.getItem('token')!);
-          } else {
-            clearAuth();
-          }
-        } catch {
-          clearAuth();
-        }
-      }
-    };
-    checkAuth();
-  }, [setAuth, clearAuth]);
+  const { isAuthenticated, isInitializing } = useAuthStore();
 
-  if (!localStorage.getItem('token')) {
+  if (isInitializing) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+          <p className="text-slate-500 font-medium animate-pulse">Verifying session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
@@ -46,25 +41,32 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function App() {
-  const { setAuth, clearAuth } = useAuthStore();
+  const { setAuth, clearAuth, setInitializing } = useAuthStore();
 
   useEffect(() => {
     // Initial handshake to set CSRF cookie and restore session
     const initApp = async () => {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        setInitializing(false);
+        return;
+      }
+
       try {
         const res = await authApi.getProfile();
-        if (res.success && localStorage.getItem('token')) {
-          setAuth(res.data, localStorage.getItem('token')!);
+        if (res.success) {
+          setAuth(res.data, token);
+        } else {
+          clearAuth();
         }
       } catch {
         // Only clear if we actually had a token but it's now invalid
-        if (localStorage.getItem('token')) {
-          clearAuth();
-        }
+        clearAuth();
       }
     };
     initApp();
-  }, [setAuth, clearAuth]);
+  }, [setAuth, clearAuth, setInitializing]);
 
   return (
     <Router>
