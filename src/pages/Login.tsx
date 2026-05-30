@@ -35,8 +35,19 @@ const Login: React.FC = () => {
     setError(null);
 
     const win = window as Window & { grecaptcha?: { getResponse: () => string; reset: () => void } };
-    const recaptchaToken = win.grecaptcha?.getResponse();
-    if (!recaptchaToken) {
+    let recaptchaToken = '';
+    
+    try {
+      if (win.grecaptcha && typeof win.grecaptcha.getResponse === 'function') {
+        recaptchaToken = win.grecaptcha.getResponse();
+      }
+    } catch (e) {
+      console.warn("Failed to get reCAPTCHA response:", e);
+    }
+
+    const isRecaptchaEnabled = !!import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+
+    if (isRecaptchaEnabled && !recaptchaToken) {
       setError('Please verify that you are not a robot.');
       setIsLoading(false);
       return;
@@ -53,11 +64,11 @@ const Login: React.FC = () => {
         useSettingsStore.getState().fetchSettings();
         navigate('/');
       } else {
-        win.grecaptcha?.reset();
+        if (isRecaptchaEnabled) win.grecaptcha?.reset();
         setError(response.message);
       }
     } catch (err: unknown) {
-      win.grecaptcha?.reset();
+      if (isRecaptchaEnabled) win.grecaptcha?.reset();
       const message = err instanceof Error && 'response' in err 
         ? (err as { response: { data: { message: string } } }).response?.data?.message 
         : 'Failed to login. Please check your credentials.';
@@ -165,12 +176,14 @@ const Login: React.FC = () => {
             </div>
 
             {/* reCAPTCHA v2 Challenge */}
-            <div className="flex justify-center my-2">
-              <div 
-                className="g-recaptcha" 
-                data-sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6Le9yP4sAAAAAABWQV9idh2L9iGZzI7SJvhm5SdU"}
-              ></div>
-            </div>
+            {import.meta.env.VITE_RECAPTCHA_SITE_KEY && (
+              <div className="flex justify-center my-2">
+                <div 
+                  className="g-recaptcha" 
+                  data-sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                ></div>
+              </div>
+            )}
 
             <button
               disabled={isLoading}
