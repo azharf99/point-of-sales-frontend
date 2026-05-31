@@ -35,22 +35,23 @@ const Login: React.FC = () => {
     setError(null);
 
     const win = window as Window & { grecaptcha?: { getResponse: () => string; reset: () => void } };
+    const isRecaptchaEnabled = !!import.meta.env.VITE_RECAPTCHA_SITE_KEY;
     let recaptchaToken = '';
     
-    try {
-      if (win.grecaptcha && typeof win.grecaptcha.getResponse === 'function') {
-        recaptchaToken = win.grecaptcha.getResponse();
+    if (isRecaptchaEnabled) {
+      try {
+        if (win.grecaptcha && typeof win.grecaptcha.getResponse === 'function') {
+          recaptchaToken = win.grecaptcha.getResponse();
+        }
+      } catch (e) {
+        console.warn("Failed to get reCAPTCHA response:", e);
       }
-    } catch (e) {
-      console.warn("Failed to get reCAPTCHA response:", e);
-    }
 
-    const isRecaptchaEnabled = !!import.meta.env.VITE_RECAPTCHA_SITE_KEY;
-
-    if (isRecaptchaEnabled && !recaptchaToken) {
-      setError('Please verify that you are not a robot.');
-      setIsLoading(false);
-      return;
+      if (!recaptchaToken) {
+        setError('Please verify that you are not a robot.');
+        setIsLoading(false);
+        return;
+      }
     }
 
     try {
