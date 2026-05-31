@@ -16,6 +16,14 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+interface CustomWindow extends Window {
+  grecaptcha?: {
+    render: (container: HTMLElement | string, parameters: { sitekey: string | undefined; callback: () => void }) => number;
+    reset: (opt_widget_id?: number) => void;
+    getResponse: (opt_widget_id?: number) => string;
+  };
+}
+
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
@@ -37,7 +45,7 @@ const Login: React.FC = () => {
     if (!isRecaptchaEnabled) return;
 
     const renderRecaptcha = () => {
-      const win = window as any;
+      const win = window as unknown as CustomWindow;
       if (win.grecaptcha && win.grecaptcha.render && recaptchaRef.current) {
         try {
           const id = win.grecaptcha.render(recaptchaRef.current, {
@@ -66,7 +74,7 @@ const Login: React.FC = () => {
     setIsLoading(true);
     setError(null);
 
-    const win = window as any;
+    const win = window as unknown as CustomWindow;
     const isRecaptchaEnabled = !!import.meta.env.VITE_RECAPTCHA_SITE_KEY;
     let recaptchaToken = '';
     
@@ -101,13 +109,21 @@ const Login: React.FC = () => {
         navigate('/dashboard');
       } else {
         if (isRecaptchaEnabled && win.grecaptcha) {
-          widgetId !== null ? win.grecaptcha.reset(widgetId) : win.grecaptcha.reset();
+          if (widgetId !== null) {
+            win.grecaptcha.reset(widgetId);
+          } else {
+            win.grecaptcha.reset();
+          }
         }
         setError(response.message);
       }
     } catch (err: unknown) {
       if (isRecaptchaEnabled && win.grecaptcha) {
-        widgetId !== null ? win.grecaptcha.reset(widgetId) : win.grecaptcha.reset();
+        if (widgetId !== null) {
+          win.grecaptcha.reset(widgetId);
+        } else {
+          win.grecaptcha.reset();
+        }
       }
       const message = err instanceof Error && 'response' in err 
         ? (err as { response: { data: { message: string } } }).response?.data?.message 
