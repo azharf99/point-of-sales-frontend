@@ -21,6 +21,8 @@ const Login: React.FC = () => {
   const setAuth = useAuthStore((state) => state.setAuth);
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+  const recaptchaRef = React.useRef<HTMLDivElement>(null);
+  const [widgetId, setWidgetId] = React.useState<number | null>(null);
 
   const {
     register,
@@ -30,18 +32,51 @@ const Login: React.FC = () => {
     resolver: zodResolver(loginSchema),
   });
 
+  React.useEffect(() => {
+    const isRecaptchaEnabled = !!import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+    if (!isRecaptchaEnabled) return;
+
+    const renderRecaptcha = () => {
+      const win = window as any;
+      if (win.grecaptcha && win.grecaptcha.render && recaptchaRef.current) {
+        try {
+          const id = win.grecaptcha.render(recaptchaRef.current, {
+            sitekey: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
+            callback: () => setError(null),
+          });
+          setWidgetId(id);
+        } catch (e) {
+          console.warn("reCAPTCHA render error:", e);
+        }
+      } else {
+        // Retry if script not loaded yet
+        setTimeout(renderRecaptcha, 500);
+      }
+    };
+
+    renderRecaptcha();
+
+    return () => {
+      // Cleanup if needed, but grecaptcha doesn't have an easy destroy for single widgets
+      // sometimes win.grecaptcha.reset(widgetId) is enough if re-rendering
+    };
+  }, []);
+
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     setError(null);
 
-    const win = window as Window & { grecaptcha?: { getResponse: () => string; reset: () => void } };
+    const win = window as any;
     const isRecaptchaEnabled = !!import.meta.env.VITE_RECAPTCHA_SITE_KEY;
     let recaptchaToken = '';
     
     if (isRecaptchaEnabled) {
       try {
         if (win.grecaptcha && typeof win.grecaptcha.getResponse === 'function') {
-          recaptchaToken = win.grecaptcha.getResponse();
+          // Use widgetId if available for more precision
+          recaptchaToken = widgetId !== null 
+            ? win.grecaptcha.getResponse(widgetId) 
+            : win.grecaptcha.getResponse();
         }
       } catch (e) {
         console.warn("Failed to get reCAPTCHA response:", e);
@@ -65,11 +100,15 @@ const Login: React.FC = () => {
         useSettingsStore.getState().fetchSettings();
         navigate('/dashboard');
       } else {
-        if (isRecaptchaEnabled) win.grecaptcha?.reset();
+        if (isRecaptchaEnabled && win.grecaptcha) {
+          widgetId !== null ? win.grecaptcha.reset(widgetId) : win.grecaptcha.reset();
+        }
         setError(response.message);
       }
     } catch (err: unknown) {
-      if (isRecaptchaEnabled) win.grecaptcha?.reset();
+      if (isRecaptchaEnabled && win.grecaptcha) {
+        widgetId !== null ? win.grecaptcha.reset(widgetId) : win.grecaptcha.reset();
+      }
       const message = err instanceof Error && 'response' in err 
         ? (err as { response: { data: { message: string } } }).response?.data?.message 
         : 'Failed to login. Please check your credentials.';
@@ -179,10 +218,7 @@ const Login: React.FC = () => {
             {/* reCAPTCHA v2 Challenge */}
             {import.meta.env.VITE_RECAPTCHA_SITE_KEY && (
               <div className="flex justify-center my-2">
-                <div 
-                  className="g-recaptcha" 
-                  data-sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
-                ></div>
+                <div ref={recaptchaRef}></div>
               </div>
             )}
 

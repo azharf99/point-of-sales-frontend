@@ -91,11 +91,9 @@ api.interceptors.response.use(
       } catch (refreshError) {
         isRefreshing = false;
         processQueue(refreshError);
-        // Clear state and redirect to login
+        // Clear state - but don't force a page reload redirect
+        // Let the application routing handle protected access
         useAuthStore.getState().clearAuth();
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
-        }
         return Promise.reject(refreshError);
       }
     }
