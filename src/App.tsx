@@ -9,6 +9,7 @@ import AuthLayout from './layouts/AuthLayout';
 
 // Pages
 import Login from './pages/Login';
+import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import POS from './pages/POS';
 import Products from './pages/Products';
@@ -55,7 +56,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -95,6 +96,9 @@ function App() {
   return (
     <Router>
       <Routes>
+        {/* Public Landing Page */}
+        <Route path="/" element={<Landing />} />
+
         {/* Auth Routes */}
         <Route path="/login" element={
           <PublicRoute>
@@ -105,7 +109,7 @@ function App() {
         } />
 
         {/* Protected Routes */}
-        <Route path="/" element={
+        <Route path="/dashboard" element={
           <ProtectedRoute>
             <Dashboard />
           </ProtectedRoute>

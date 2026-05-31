@@ -81,7 +81,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   };
 
   const navItems = [
-    { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
+    { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { name: 'POS / Checkout', icon: ShoppingCart, path: '/pos' },
     { name: 'Products', icon: Package, path: '/products' },
     { name: 'Customers', icon: Users, path: '/customers' },

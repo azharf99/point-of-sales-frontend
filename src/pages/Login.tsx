@@ -62,7 +62,7 @@ const Login: React.FC = () => {
       if (response.success) {
         setAuth(response.data.user);
         useSettingsStore.getState().fetchSettings();
-        navigate('/');
+        navigate('/dashboard');
       } else {
         if (isRecaptchaEnabled) win.grecaptcha?.reset();
         setError(response.message);
