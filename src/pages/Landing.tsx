@@ -8,12 +8,13 @@ import {
   Users, 
   ShieldCheck, 
   Zap,
-  Star
+  Star,
+  Loader2
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 
 const Landing = () => {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isInitializing } = useAuthStore();
   const navigate = useNavigate();
 
   const features = [
@@ -48,6 +49,14 @@ const Landing = () => {
       icon: <ShoppingCart className="w-6 h-6 text-blue-600" />
     }
   ];
+
+  if (isInitializing) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-white">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900">

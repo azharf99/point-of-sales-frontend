@@ -96,7 +96,7 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Public Landing Page */}
+        {/* Public Landing Page - Always Accessible */}
         <Route path="/" element={<Landing />} />
 
         {/* Auth Routes */}
