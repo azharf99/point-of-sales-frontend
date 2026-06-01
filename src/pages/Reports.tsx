@@ -211,6 +211,39 @@ const Reports: React.FC = () => {
             </div>
           </div>
 
+          {report?.sales_by_order_type && (
+            <div className="bg-white p-6 lg:p-8 rounded-2xl border border-slate-200 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900 mb-6">Order Types Analytics</h3>
+              <div className="space-y-4">
+                {[
+                  { key: 'dine_in', label: 'Dine-In', color: 'bg-blue-500' },
+                  { key: 'take_away', label: 'Take Away', color: 'bg-orange-500' },
+                  { key: 'delivery_gojek', label: 'Gojek Delivery', color: 'bg-emerald-500' },
+                  { key: 'delivery_grab', label: 'Grab Delivery', color: 'bg-green-600' },
+                ].map((type) => {
+                  const sales = report.sales_by_order_type?.[type.key] || 0;
+                  const count = report.item_count_by_order_type?.[type.key] || 0;
+                  const totalForPercentage = Object.values(report.sales_by_order_type || {}).reduce((a, b) => a + b, 0);
+                  const percentage = totalForPercentage > 0 ? (sales / totalForPercentage) * 100 : 0;
+                  return (
+                    <div key={type.key} className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-bold text-slate-700">
+                        <span>{type.label} ({count} items)</span>
+                        <span>{formatCurrency(sales, settings)}</span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className={cn("h-full rounded-full transition-all duration-500", type.color)} 
+                          style={{ width: `${Math.min(100, percentage)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="bg-slate-900 p-8 rounded-2xl text-white relative overflow-hidden group">
             <TrendingUp className="absolute -bottom-4 -right-4 w-32 h-32 text-white/5 group-hover:scale-110 transition-transform duration-500" />
             <h3 className="text-lg font-bold mb-2 relative z-10">Intelligence Tip</h3>

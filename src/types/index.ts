@@ -47,6 +47,8 @@ export interface Product {
   cost_price: number;
   stock: number;
   min_stock: number;
+  image_url?: string;
+  thumbnail_url?: string;
 }
 
 export interface TransactionItem {
@@ -55,6 +57,7 @@ export interface TransactionItem {
   quantity: number;
   price: number;
   subtotal: number;
+  order_type: string;
 }
 
 export interface Transaction {
@@ -93,6 +96,8 @@ export interface SalesReport {
   cash_payments: number;
   snap_payments: number;
   total_discount: number;
+  sales_by_order_type: Record<string, number>;
+  item_count_by_order_type: Record<string, number>;
 }
 
 export interface StoreSetting {

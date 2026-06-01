@@ -25,9 +25,11 @@ import { customerApi } from '../api/customers';
 import type { Product, Category, Customer } from '../types';
 import { cn } from '../utils/cn';
 import { useSettingsStore, formatCurrency } from '../store/settingsStore';
+import { getProductImageUrl } from '../utils/image';
 
 interface CartItem extends Product {
   quantity: number;
+  order_type?: string;
 }
 
 const POINTS_VALUE = 1000; // 1 point = Rp1,000
@@ -262,14 +264,15 @@ const POS: React.FC = () => {
         discount: number;
         redeem_points: number;
         customer_id?: number;
-        items: { product_id: number; quantity: number }[];
+        items: { product_id: number; quantity: number; order_type: string }[];
       } = {
         payment_method: paymentMethod,
         discount: discount,
         redeem_points: redeemPoints,
         items: cart.map(item => ({
           product_id: item.id,
-          quantity: item.quantity
+          quantity: item.quantity,
+          order_type: item.order_type || 'dine_in'
         }))
       };
 
@@ -445,8 +448,16 @@ const POS: React.FC = () => {
                   onClick={() => addToCart(product)}
                   className="bg-white p-3 lg:p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:shadow-md transition-all text-left group flex flex-col h-full"
                 >
-                  <div className="aspect-square bg-slate-100 rounded-lg mb-3 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors shrink-0">
-                    <Package className="w-8 lg:w-10 h-8 lg:h-10" />
+                  <div className="aspect-square bg-slate-100 rounded-lg mb-3 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 transition-all overflow-hidden border border-slate-100 shrink-0">
+                    {product.thumbnail_url || product.image_url ? (
+                      <img 
+                        src={getProductImageUrl(product.thumbnail_url || product.image_url)} 
+                        alt={product.name} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" 
+                      />
+                    ) : (
+                      <Package className="w-8 lg:w-10 h-8 lg:h-10 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0 mb-3">
                     <h3 className="font-semibold text-slate-900 text-sm lg:text-base mb-1 truncate leading-tight">{product.name}</h3>
@@ -544,7 +555,23 @@ const POS: React.FC = () => {
               <div key={item.id} className="flex gap-3 lg:gap-4 group">
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-medium text-slate-900 truncate leading-tight mb-0.5">{item.name}</h4>
-                  <p className="text-xs font-bold text-blue-600">{formatCurrency(item.price || 0, settings)}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-blue-600">{formatCurrency(item.price || 0, settings)}</span>
+                    <span className="text-[10px] font-medium text-slate-400">•</span>
+                    <select
+                      value={item.order_type || 'dine_in'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCart(prev => prev.map(c => c.id === item.id ? { ...c, order_type: val } : c));
+                      }}
+                      className="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 border-none rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-600 cursor-pointer transition-all"
+                    >
+                      <option value="dine_in">Dine-In</option>
+                      <option value="take_away">Take Away</option>
+                      <option value="delivery_gojek">Gojek Delivery</option>
+                      <option value="delivery_grab">Grab Delivery</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <div className="flex items-center bg-slate-100 rounded-lg p-0.5 lg:p-1">

@@ -40,4 +40,14 @@ export const productApi = {
     const response = await api.post<ApiResponse<Category>>('/products/categories', data);
     return response.data;
   },
+  uploadImage: async (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await api.post<ApiResponse<Product>>(`/products/${id}/image`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 };

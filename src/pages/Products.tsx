@@ -20,6 +20,7 @@ import { useAuthStore } from '../store/authStore';
 import type { Product, Category } from '../types';
 import { cn } from '../utils/cn';
 import { useSettingsStore, formatCurrency } from '../store/settingsStore';
+import { getProductImageUrl } from '../utils/image';
 
 const Products: React.FC = () => {
   const { user } = useAuthStore();
@@ -45,6 +46,8 @@ const Products: React.FC = () => {
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Partial<Product> | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // Category Modal State
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -142,6 +145,8 @@ const Products: React.FC = () => {
   // Product Actions
   const handleEditProduct = (product: Product) => {
     setSelectedProduct(product);
+    setImageFile(null);
+    setImagePreview(product.image_url ? getProductImageUrl(product.image_url) : null);
     setIsProductModalOpen(true);
   };
 
@@ -156,6 +161,8 @@ const Products: React.FC = () => {
       stock: 0,
       min_stock: 10
     });
+    setImageFile(null);
+    setImagePreview(null);
     setIsProductModalOpen(true);
   };
 
@@ -165,11 +172,20 @@ const Products: React.FC = () => {
 
     setIsSavingProduct(true);
     try {
+      let savedProduct: Product;
       if (selectedProduct.id) {
-        await productApi.update(selectedProduct.id, selectedProduct);
+        const res = await productApi.update(selectedProduct.id, selectedProduct);
+        savedProduct = res.data;
       } else {
-        await productApi.create(selectedProduct);
+        const res = await productApi.create(selectedProduct);
+        savedProduct = res.data;
       }
+
+      // Upload image if selected
+      if (imageFile && savedProduct.id) {
+        await productApi.uploadImage(savedProduct.id, imageFile);
+      }
+
       setIsProductModalOpen(false);
       await Promise.all([
         fetchProducts(currentPage),
@@ -347,8 +363,16 @@ const Products: React.FC = () => {
                     <tr key={product.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-4 lg:px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 lg:w-10 lg:h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 shrink-0 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
-                            <Package className="w-4 lg:w-5 h-4 lg:h-5" />
+                          <div className="w-9 h-9 lg:w-10 lg:h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 shrink-0 group-hover:bg-blue-50 transition-colors overflow-hidden border border-slate-100">
+                             {product.thumbnail_url || product.image_url ? (
+                               <img 
+                                 src={getProductImageUrl(product.thumbnail_url || product.image_url)} 
+                                 alt={product.name} 
+                                 className="w-full h-full object-cover" 
+                               />
+                             ) : (
+                               <Package className="w-4 lg:w-5 h-4 lg:h-5 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                             )}
                           </div>
                           <div className="min-w-0">
                             <p className="font-bold text-slate-900 text-sm truncate">{product.name}</p>
@@ -583,6 +607,41 @@ const Products: React.FC = () => {
                     <div className="space-y-1.5">
                       <label className="text-sm font-bold text-slate-700">Min. Stock</label>
                       <input required type="number" value={selectedProduct?.min_stock || ''} onChange={(e) => setSelectedProduct({ ...selectedProduct, min_stock: Number(e.target.value) })} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 pt-2">
+                    <label className="text-sm font-bold text-slate-700 block">Product Photo</label>
+                    <div className="flex items-center gap-4 mt-1">
+                      <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                        {imagePreview ? (
+                          <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <Package className="w-6 h-6 text-slate-300" />
+                         )}
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <input 
+                          type="file" 
+                          accept="image/png, image/jpeg, image/jpg, image/webp" 
+                          id="product-image-file" 
+                          className="hidden" 
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 5 * 1024 * 1024) {
+                                alert("Max size is 5MB");
+                                return;
+                              }
+                              setImageFile(file);
+                              setImagePreview(URL.createObjectURL(file));
+                            }
+                          }}
+                        />
+                        <label htmlFor="product-image-file" className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-xs font-bold text-slate-600 rounded-xl bg-white hover:bg-slate-50 transition-all select-none">
+                          Choose Photo
+                        </label>
+                        <p className="text-[9px] text-slate-400">Supports JPG, JPEG, PNG, WEBP (Max 5MB)</p>
+                      </div>
                     </div>
                   </div>
                 </div>
