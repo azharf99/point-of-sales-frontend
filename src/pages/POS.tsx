@@ -555,9 +555,9 @@ const POS: React.FC = () => {
         "fixed inset-y-0 right-0 z-50 w-[90%] sm:w-96 lg:static lg:w-96 flex flex-col bg-white border-l lg:border border-slate-200 lg:rounded-2xl overflow-hidden shadow-2xl lg:shadow-sm transform transition-transform duration-300 ease-in-out h-full shrink-0",
         isCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
       )}>
-        <div className="p-4 lg:p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
-          <h2 className="text-lg lg:text-xl font-bold text-slate-900 flex items-center gap-2">
-            <ShoppingBag className="w-5 lg:w-6 h-5 lg:h-6 text-blue-600" />
+        <div className="p-3 lg:p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+          <h2 className="text-base lg:text-lg font-bold text-slate-900 flex items-center gap-2">
+            <ShoppingBag className="w-4 lg:w-5 h-4 lg:h-5 text-blue-600" />
             Current Order
           </h2>
           <div className="flex items-center gap-3">
@@ -572,7 +572,7 @@ const POS: React.FC = () => {
 
         {/* Customer Info in Cart (compact) */}
         {selectedCustomer && (
-          <div className="px-4 lg:px-6 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100 shrink-0">
+          <div className="px-3 lg:px-4 py-2 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100 shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-amber-600" />
@@ -589,7 +589,7 @@ const POS: React.FC = () => {
           </div>
         )}
 
-        <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-4">
+        <div className="flex-1 overflow-auto p-3 lg:p-4 space-y-3">
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-4">
               <ShoppingBag className="w-12 h-12 opacity-20" />
@@ -599,7 +599,7 @@ const POS: React.FC = () => {
             cart.map((item) => {
               const currentOrderType = item.order_type || 'dine_in';
               return (
-              <div key={`${item.id}-${currentOrderType}`} className="flex gap-3 lg:gap-4 group">
+              <div key={`${item.id}-${currentOrderType}`} className="flex gap-2 lg:gap-3 group">
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-medium text-slate-900 truncate leading-tight mb-0.5">{item.name}</h4>
                   <div className="flex items-center gap-2">
@@ -647,17 +647,17 @@ const POS: React.FC = () => {
           )}
         </div>
 
-        <div className="p-4 lg:p-6 bg-slate-50 border-t border-slate-100 shrink-0">
+        <div className="p-3 lg:p-4 bg-slate-50 border-t border-slate-100 shrink-0">
           {/* Redeem Points UI */}
           {selectedCustomer && selectedCustomer.points > 0 && cart.length > 0 && (
-            <div className="mb-3 bg-amber-50/50 border border-amber-100 rounded-xl p-3 animate-in slide-in-from-bottom-2 duration-200">
+            <div className="mb-2 bg-amber-50/50 border border-amber-100 rounded-lg p-2 animate-in slide-in-from-bottom-2 duration-200">
               <div 
                 className="flex items-center justify-between cursor-pointer select-none"
                 onClick={() => setIsRedeemExpanded(!isRedeemExpanded)}
               >
                 <div className="flex items-center gap-1.5">
-                  <Gift className="w-4 h-4 text-amber-600" />
-                  <span className="text-xs font-bold text-slate-700">Tukar Points untuk Discount</span>
+                  <Gift className="w-3.5 h-3.5 text-amber-600" />
+                  <span className="text-xs font-bold text-slate-700">Tukar Points</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {redeemPoints > 0 && (
@@ -665,29 +665,29 @@ const POS: React.FC = () => {
                       {redeemPoints} pts
                     </span>
                   )}
-                  <span className="text-xs text-amber-700 font-bold hover:underline">
-                    {isRedeemExpanded ? 'Sembunyikan' : 'Buka'}
+                  <span className="text-[10px] text-amber-700 font-bold hover:underline">
+                    {isRedeemExpanded ? 'Tutup' : 'Buka'}
                   </span>
                 </div>
               </div>
 
               {isRedeemExpanded && (
-                <div className="mt-3 pt-3 border-t border-amber-100/70 space-y-3">
+                <div className="mt-2 pt-2 border-t border-amber-100/70 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500 font-medium">
+                    <span className="text-[9px] text-slate-500 font-medium">
                       1 pt = Rp1.000
                     </span>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <input
                       type="range"
                       min="0"
                       max={maxRedeemablePoints}
                       value={redeemPoints}
                       onChange={(e) => setRedeemPoints(Number(e.target.value))}
-                      className="flex-1 accent-amber-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                      className="flex-1 accent-amber-600 h-1 bg-slate-200 rounded-lg cursor-pointer"
                     />
-                    <div className="flex items-center gap-1 border border-amber-200 bg-white px-2 py-1 rounded-lg shrink-0">
+                    <div className="flex items-center gap-1 border border-amber-200 bg-white px-1.5 py-0.5 rounded shrink-0">
                       <input
                         type="number"
                         min="0"
@@ -697,13 +697,13 @@ const POS: React.FC = () => {
                           const val = Math.min(maxRedeemablePoints, Math.max(0, Number(e.target.value)));
                           setRedeemPoints(val);
                         }}
-                        className="w-10 text-center font-bold text-slate-800 text-sm focus:outline-none"
+                        className="w-8 text-center font-bold text-slate-800 text-[10px] focus:outline-none"
                       />
-                      <span className="text-xs text-slate-400 font-medium">pts</span>
+                      <span className="text-[10px] text-slate-400 font-medium">pts</span>
                     </div>
                   </div>
-                  <div className="flex justify-between items-center text-[10px] text-slate-500 font-medium">
-                    <span>Maksimal redeem: {maxRedeemablePoints} pts</span>
+                  <div className="flex justify-between items-center text-[9px] text-slate-500 font-medium">
+                    <span>Max: {maxRedeemablePoints} pts</span>
                     {redeemPoints > 0 && (
                       <span className="text-amber-600 font-bold animate-pulse">
                         Potongan: -{formatCurrency(pointsDiscount, settings)}
@@ -715,7 +715,7 @@ const POS: React.FC = () => {
             </div>
           )}
 
-          <div className="space-y-2 mb-4 lg:mb-6 text-xs lg:text-sm">
+          <div className="space-y-1.5 mb-3 text-xs lg:text-sm">
             <div className="flex justify-between text-slate-600">
               <span>Subtotal</span>
               <span className="font-semibold">{formatCurrency(subtotal, settings)}</span>
@@ -728,7 +728,7 @@ const POS: React.FC = () => {
             )}
             {redeemPoints > 0 && (
               <div className="flex justify-between text-amber-600">
-                <span>Point Discount ({redeemPoints} pts)</span>
+                <span>Point Disc ({redeemPoints} pts)</span>
                 <span className="font-semibold">-{formatCurrency(pointsDiscount, settings)}</span>
               </div>
             )}
@@ -760,49 +760,49 @@ const POS: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="flex justify-between text-lg lg:text-xl font-bold text-slate-900 pt-3 lg:pt-4 border-t border-slate-200 mt-2">
+            <div className="flex justify-between text-base lg:text-lg font-bold text-slate-900 pt-2 border-t border-slate-200 mt-1.5">
               <span>Total</span>
               <span className="text-blue-600">{formatCurrency(total, settings)}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 lg:gap-3 mb-4 shrink-0">
+          <div className="grid grid-cols-2 gap-2 mb-3 shrink-0">
             <button
               onClick={() => setPaymentMethod('cash')}
               className={cn(
-                "flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all",
+                "flex items-center justify-center gap-1.5 p-2 rounded-lg border-2 transition-all",
                 paymentMethod === 'cash' 
                   ? "border-blue-600 bg-blue-50 text-blue-600" 
                   : "border-slate-200 text-slate-500 hover:border-slate-300"
               )}
             >
-              <Banknote className="w-5 lg:w-6 h-5 lg:h-6 shrink-0" />
-              <span className="text-[10px] lg:text-xs font-bold uppercase tracking-wider">Cash</span>
+              <Banknote className="w-4 lg:w-5 h-4 lg:h-5 shrink-0" />
+              <span className="text-[10px] lg:text-[11px] font-bold uppercase tracking-wider">Cash</span>
             </button>
             <button
               onClick={() => setPaymentMethod('snap')}
               className={cn(
-                "flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all",
+                "flex items-center justify-center gap-1.5 p-2 rounded-lg border-2 transition-all",
                 paymentMethod === 'snap' 
                   ? "border-blue-600 bg-blue-50 text-blue-600" 
                   : "border-slate-200 text-slate-500 hover:border-slate-300"
               )}
             >
-              <CreditCard className="w-5 lg:w-6 h-5 lg:h-6 shrink-0" />
-              <span className="text-[10px] lg:text-xs font-bold uppercase tracking-wider">Snap</span>
+              <CreditCard className="w-4 lg:w-5 h-4 lg:h-5 shrink-0" />
+              <span className="text-[10px] lg:text-[11px] font-bold uppercase tracking-wider">Snap</span>
             </button>
           </div>
 
           <button
             disabled={cart.length === 0 || isCheckingOut}
             onClick={handleCheckout}
-            className="w-full bg-blue-600 text-white font-bold py-3.5 lg:py-4 rounded-xl hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2 shrink-0 active:scale-95"
+            className="w-full bg-blue-600 text-white font-bold py-2.5 lg:py-3 rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed shadow-md shadow-blue-200 transition-all flex items-center justify-center gap-2 shrink-0 active:scale-95"
           >
             {isCheckingOut ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <>
-                <ShoppingCart className="w-5 h-5" />
+                <ShoppingCart className="w-4 h-4" />
                 Checkout
               </>
             )}
