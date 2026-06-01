@@ -66,6 +66,7 @@ const POS: React.FC = () => {
   
   // Redeem Points state
   const [redeemPoints, setRedeemPoints] = useState(0);
+  const [isRedeemExpanded, setIsRedeemExpanded] = useState(false);
   
   // Success state
   const [showSuccess, setShowSuccess] = useState(false);
@@ -191,6 +192,7 @@ const POS: React.FC = () => {
   const clearCustomer = () => {
     setSelectedCustomer(null);
     setRedeemPoints(0);
+    setIsRedeemExpanded(false);
   };
 
   const addToCart = (product: Product) => {
@@ -199,30 +201,43 @@ const POS: React.FC = () => {
       return;
     }
     setCart((prevCart) => {
-      const existingItem = prevCart.find((item) => item.id === product.id);
-      if (existingItem) {
-        if (existingItem.quantity >= product.stock) {
+      const orderType = 'dine_in';
+      const existingItemIndex = prevCart.findIndex((item) => item.id === product.id && (item.order_type || 'dine_in') === orderType);
+      
+      const totalQuantityInCart = prevCart.filter(c => c.id === product.id).reduce((sum, c) => sum + c.quantity, 0);
+
+      if (existingItemIndex >= 0) {
+        if (totalQuantityInCart >= product.stock) {
           alert(`Cannot add more. Only ${product.stock} units available in stock.`);
           return prevCart;
         }
-        return prevCart.map((item) =>
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-        );
+        const newCart = [...prevCart];
+        newCart[existingItemIndex] = { ...newCart[existingItemIndex], quantity: newCart[existingItemIndex].quantity + 1 };
+        return newCart;
       }
-      return [...prevCart, { ...product, quantity: 1 }];
+      
+      if (totalQuantityInCart >= product.stock) {
+          alert(`Cannot add more. Only ${product.stock} units available in stock.`);
+          return prevCart;
+      }
+
+      return [...prevCart, { ...product, quantity: 1, order_type: orderType }];
     });
   };
 
-  const removeFromCart = (productId: number) => {
-    setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
+  const removeFromCart = (productId: number, orderType: string) => {
+    setCart((prevCart) => prevCart.filter((item) => !(item.id === productId && (item.order_type || 'dine_in') === orderType)));
   };
 
-  const updateQuantity = (productId: number, delta: number) => {
+  const updateQuantity = (productId: number, orderType: string, delta: number) => {
     setCart((prevCart) =>
       prevCart.map((item) => {
-        if (item.id === productId) {
+        if (item.id === productId && (item.order_type || 'dine_in') === orderType) {
           const newQuantity = Math.max(1, item.quantity + delta);
-          if (newQuantity > item.stock) {
+          const totalQuantityInCart = prevCart.filter(c => c.id === productId).reduce((sum, c) => sum + c.quantity, 0);
+          const otherQuantity = totalQuantityInCart - item.quantity;
+          
+          if (newQuantity + otherQuantity > item.stock) {
             alert(`Cannot exceed available stock (${item.stock} units).`);
             return item;
           }
@@ -231,6 +246,31 @@ const POS: React.FC = () => {
         return item;
       })
     );
+  };
+
+  const updateOrderType = (productId: number, oldOrderType: string, newOrderType: string) => {
+    setCart((prevCart) => {
+      const itemToChange = prevCart.find(item => item.id === productId && (item.order_type || 'dine_in') === oldOrderType);
+      if (!itemToChange) return prevCart;
+
+      const existingItemWithNewType = prevCart.find(item => item.id === productId && (item.order_type || 'dine_in') === newOrderType);
+
+      if (existingItemWithNewType) {
+        return prevCart.map(item => {
+          if (item.id === productId && (item.order_type || 'dine_in') === newOrderType) {
+            return { ...item, quantity: item.quantity + itemToChange.quantity };
+          }
+          return item;
+        }).filter(item => !(item.id === productId && (item.order_type || 'dine_in') === oldOrderType));
+      } else {
+        return prevCart.map(item => {
+          if (item.id === productId && (item.order_type || 'dine_in') === oldOrderType) {
+            return { ...item, order_type: newOrderType };
+          }
+          return item;
+        });
+      }
+    });
   };
 
   const handleBarcodeLookup = async (e: React.FormEvent) => {
@@ -312,6 +352,7 @@ const POS: React.FC = () => {
           setCart([]);
           setDiscount(0);
           setRedeemPoints(0);
+          setIsRedeemExpanded(false);
           setSelectedCustomer(null);
           setIsCartOpen(false);
         }
@@ -555,18 +596,19 @@ const POS: React.FC = () => {
               <p className="text-sm font-medium">Your basket is empty</p>
             </div>
           ) : (
-            cart.map((item) => (
-              <div key={item.id} className="flex gap-3 lg:gap-4 group">
+            cart.map((item) => {
+              const currentOrderType = item.order_type || 'dine_in';
+              return (
+              <div key={`${item.id}-${currentOrderType}`} className="flex gap-3 lg:gap-4 group">
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-medium text-slate-900 truncate leading-tight mb-0.5">{item.name}</h4>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-blue-600">{formatCurrency(item.price || 0, settings)}</span>
                     <span className="text-[10px] font-medium text-slate-400">•</span>
                     <select
-                      value={item.order_type || 'dine_in'}
+                      value={currentOrderType}
                       onChange={(e) => {
-                        const val = e.target.value;
-                        setCart(prev => prev.map(c => c.id === item.id ? { ...c, order_type: val } : c));
+                        updateOrderType(item.id, currentOrderType, e.target.value);
                       }}
                       className="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 border-none rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-600 cursor-pointer transition-all"
                     >
@@ -580,76 +622,96 @@ const POS: React.FC = () => {
                 <div className="flex items-center gap-2 shrink-0">
                   <div className="flex items-center bg-slate-100 rounded-lg p-0.5 lg:p-1">
                     <button
-                      onClick={() => updateQuantity(item.id, -1)}
+                      onClick={() => updateQuantity(item.id, currentOrderType, -1)}
                       className="p-1 hover:bg-white rounded transition-colors"
                     >
                       <Minus className="w-3 lg:w-4 h-3 lg:h-4" />
                     </button>
                     <span className="w-6 lg:w-8 text-center text-xs lg:text-sm font-bold">{item.quantity}</span>
                     <button
-                      onClick={() => updateQuantity(item.id, 1)}
+                      onClick={() => updateQuantity(item.id, currentOrderType, 1)}
                       className="p-1 hover:bg-white rounded transition-colors"
                     >
                       <Plus className="w-3 lg:w-4 h-3 lg:h-4" />
                     </button>
                   </div>
                   <button
-                    onClick={() => removeFromCart(item.id)}
+                    onClick={() => removeFromCart(item.id, currentOrderType)}
                     className="p-1.5 lg:p-2 text-slate-400 hover:text-red-500 transition-colors"
                   >
                     <Trash2 className="w-3.5 lg:w-4 h-3.5 lg:h-4" />
                   </button>
                 </div>
               </div>
-            ))
+            )})
           )}
         </div>
 
         <div className="p-4 lg:p-6 bg-slate-50 border-t border-slate-100 shrink-0">
           {/* Redeem Points UI */}
           {selectedCustomer && selectedCustomer.points > 0 && cart.length > 0 && (
-            <div className="mb-4 bg-amber-50/50 border border-amber-100 rounded-xl p-3 animate-in slide-in-from-bottom-2 duration-200">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Gift className="w-4 h-4 text-amber-600 animate-pulse" />
-                  Tukar Points untuk Discount
-                </label>
-                <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-1.5 py-0.5 rounded-md">
-                  1 pt = Rp1.000
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="0"
-                  max={maxRedeemablePoints}
-                  value={redeemPoints}
-                  onChange={(e) => setRedeemPoints(Number(e.target.value))}
-                  className="flex-1 accent-amber-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
-                />
-                <div className="flex items-center gap-1 border border-amber-200 bg-white px-2 py-1 rounded-lg shrink-0">
-                  <input
-                    type="number"
-                    min="0"
-                    max={maxRedeemablePoints}
-                    value={redeemPoints}
-                    onChange={(e) => {
-                      const val = Math.min(maxRedeemablePoints, Math.max(0, Number(e.target.value)));
-                      setRedeemPoints(val);
-                    }}
-                    className="w-10 text-center font-bold text-slate-800 text-sm focus:outline-none"
-                  />
-                  <span className="text-xs text-slate-400 font-medium">pts</span>
+            <div className="mb-3 bg-amber-50/50 border border-amber-100 rounded-xl p-3 animate-in slide-in-from-bottom-2 duration-200">
+              <div 
+                className="flex items-center justify-between cursor-pointer select-none"
+                onClick={() => setIsRedeemExpanded(!isRedeemExpanded)}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Gift className="w-4 h-4 text-amber-600" />
+                  <span className="text-xs font-bold text-slate-700">Tukar Points untuk Discount</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {redeemPoints > 0 && (
+                    <span className="text-[10px] bg-amber-600 text-white px-1.5 py-0.5 rounded-full font-bold">
+                      {redeemPoints} pts
+                    </span>
+                  )}
+                  <span className="text-xs text-amber-700 font-bold hover:underline">
+                    {isRedeemExpanded ? 'Sembunyikan' : 'Buka'}
+                  </span>
                 </div>
               </div>
-              <div className="flex justify-between items-center mt-2 text-[10px] text-slate-500 font-medium">
-                <span>Maksimal redeem: {maxRedeemablePoints} pts</span>
-                {redeemPoints > 0 && (
-                  <span className="text-amber-600 font-bold animate-pulse">
-                    Potongan: -{formatCurrency(pointsDiscount, settings)}
-                  </span>
-                )}
-              </div>
+
+              {isRedeemExpanded && (
+                <div className="mt-3 pt-3 border-t border-amber-100/70 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      1 pt = Rp1.000
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="0"
+                      max={maxRedeemablePoints}
+                      value={redeemPoints}
+                      onChange={(e) => setRedeemPoints(Number(e.target.value))}
+                      className="flex-1 accent-amber-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                    />
+                    <div className="flex items-center gap-1 border border-amber-200 bg-white px-2 py-1 rounded-lg shrink-0">
+                      <input
+                        type="number"
+                        min="0"
+                        max={maxRedeemablePoints}
+                        value={redeemPoints}
+                        onChange={(e) => {
+                          const val = Math.min(maxRedeemablePoints, Math.max(0, Number(e.target.value)));
+                          setRedeemPoints(val);
+                        }}
+                        className="w-10 text-center font-bold text-slate-800 text-sm focus:outline-none"
+                      />
+                      <span className="text-xs text-slate-400 font-medium">pts</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-[10px] text-slate-500 font-medium">
+                    <span>Maksimal redeem: {maxRedeemablePoints} pts</span>
+                    {redeemPoints > 0 && (
+                      <span className="text-amber-600 font-bold animate-pulse">
+                        Potongan: -{formatCurrency(pointsDiscount, settings)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
