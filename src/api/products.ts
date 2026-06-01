@@ -50,4 +50,24 @@ export const productApi = {
     });
     return response.data;
   },
+  uploadCategoryCSV: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiResponse<Category[]>>('/products/categories/csv', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  uploadProductCSV: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiResponse<Product[]>>('/products/csv', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 };

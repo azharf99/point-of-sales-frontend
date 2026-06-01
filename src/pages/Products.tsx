@@ -13,7 +13,8 @@ import {
   Tag,
   DollarSign,
   FolderTree,
-  Trash2
+  Trash2,
+  FileSpreadsheet
 } from 'lucide-react';
 import { productApi } from '../api/products';
 import { useAuthStore } from '../store/authStore';
@@ -225,6 +226,35 @@ const Products: React.FC = () => {
     }
   };
 
+  const [isUploadingCSV, setIsUploadingCSV] = useState(false);
+
+  const handleCSVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingCSV(true);
+    try {
+      if (activeTab === 'products') {
+        await productApi.uploadProductCSV(file);
+        alert('Products imported successfully!');
+        await Promise.all([
+          fetchProducts(currentPage),
+          fetchLowStockCount()
+        ]);
+      } else {
+        await productApi.uploadCategoryCSV(file);
+        alert('Categories imported successfully!');
+        await fetchCategories();
+      }
+    } catch (err: any) {
+      console.error('CSV Import failed', err);
+      alert('CSV Import failed: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setIsUploadingCSV(false);
+      e.target.value = '';
+    }
+  };
+
   const getStatusBadge = (stock: number, minStock: number) => {
     if (stock <= 0) {
       return (
@@ -332,13 +362,38 @@ const Products: React.FC = () => {
               className="w-full pl-9 lg:pl-10 pr-4 py-2 lg:py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
             />
           </div>
-          <button 
-            onClick={activeTab === 'products' ? handleAddProduct : handleAddCategory}
-            className="flex items-center justify-center gap-2 bg-blue-600 text-white px-5 lg:px-6 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 text-sm whitespace-nowrap active:scale-95"
-          >
-            <Plus className="w-4 h-4 lg:w-5 lg:h-5" />
-            {activeTab === 'products' ? 'Add Product' : 'New Category'}
-          </button>
+          <div className="flex items-center gap-3">
+            <input
+              type="file"
+              accept=".csv"
+              id="csv-upload-input"
+              className="hidden"
+              onChange={handleCSVUpload}
+              disabled={isUploadingCSV}
+            />
+            <label
+              htmlFor="csv-upload-input"
+              className={cn(
+                "flex items-center justify-center gap-2 border border-slate-200 bg-white text-slate-700 px-4 py-2.5 rounded-xl font-bold hover:bg-slate-50 transition-all text-sm whitespace-nowrap cursor-pointer active:scale-95 select-none shadow-sm",
+                isUploadingCSV && "opacity-50 pointer-events-none"
+              )}
+            >
+              {isUploadingCSV ? (
+                <Loader2 className="w-4 h-4 lg:w-5 lg:h-5 animate-spin text-emerald-600" />
+              ) : (
+                <FileSpreadsheet className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-600" />
+              )}
+              {isUploadingCSV ? 'Importing...' : 'Import CSV'}
+            </label>
+
+            <button 
+              onClick={activeTab === 'products' ? handleAddProduct : handleAddCategory}
+              className="flex items-center justify-center gap-2 bg-blue-600 text-white px-5 lg:px-6 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 text-sm whitespace-nowrap active:scale-95"
+            >
+              <Plus className="w-4 h-4 lg:w-5 lg:h-5" />
+              {activeTab === 'products' ? 'Add Product' : 'New Category'}
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
