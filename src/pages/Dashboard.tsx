@@ -17,7 +17,6 @@ import { cn } from '../utils/cn';
 const Dashboard: React.FC = () => {
   const { settings, fetchSettings } = useSettingsStore();
   const [report, setReport] = useState<SalesReport | null>(null);
-  const [compReport, setCompReport] = useState<SalesReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | '7days' | 'month'>('today');
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
@@ -43,26 +42,8 @@ const Dashboard: React.FC = () => {
         startDate = firstDayOfMonth.toISOString().split('T')[0];
       }
 
-      // Compute comparison period
-      let compStart = '';
-      let compEnd = '';
-      
-      const startMs = new Date(startDate).getTime();
-      const endMs = new Date(endDate).getTime();
-      const duration = endMs - startMs + 86400000;
-
-      const compStartObj = new Date(startMs - duration);
-      const compEndObj = new Date(endMs - duration);
-      compStart = compStartObj.toISOString().split('T')[0];
-      compEnd = compEndObj.toISOString().split('T')[0];
-
-      const [res, compRes] = await Promise.all([
-        reportApi.getSales(startDate, endDate),
-        reportApi.getSales(compStart, compEnd).catch(() => ({ data: null }))
-      ]);
-
+      const res = await reportApi.getSales(startDate, endDate);
       setReport(res.data);
-      setCompReport(compRes.data || null);
     } catch (err) {
       console.error('Failed to fetch report', err);
     } finally {
@@ -123,32 +104,6 @@ const Dashboard: React.FC = () => {
     };
   }, [fetchRecentTransactions]);
 
-  const getTrend = (type: 'revenue' | 'orders' | 'ticket') => {
-    if (!report || !compReport) return { label: '0.0%', up: true };
-    
-    let current = 0;
-    let previous = 0;
-    
-    if (type === 'revenue') {
-      current = report.total_sales;
-      previous = compReport.total_sales;
-    } else if (type === 'orders') {
-      current = report.order_volume;
-      previous = compReport.order_volume;
-    } else if (type === 'ticket') {
-      current = report.average_ticket;
-      previous = compReport.average_ticket;
-    }
-    
-    if (previous === 0) {
-      return current > 0 ? { label: '+100.0%', up: true } : { label: '0.0%', up: true };
-    }
-    
-    const pct = ((current - previous) / previous) * 100;
-    const label = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
-    return { label, up: pct >= 0 };
-  };
-
   const stats = [
     { 
       label: 'Total Revenue', 
@@ -156,26 +111,26 @@ const Dashboard: React.FC = () => {
       icon: TrendingUp, 
       color: 'text-green-600', 
       bg: 'bg-green-100',
-      trend: getTrend('revenue').label,
-      trendUp: getTrend('revenue').up
+      trend: report?.revenue_trend?.label || '0.0%',
+      trendUp: report?.revenue_trend?.is_up !== false
     },
     { 
       label: 'Orders', 
-      value: report?.order_volume?.toString() || '0', 
+      value: report?.total_orders?.toString() || '0', 
       icon: ShoppingBag, 
       color: 'text-blue-600', 
       bg: 'bg-blue-100',
-      trend: getTrend('orders').label,
-      trendUp: getTrend('orders').up
+      trend: report?.orders_trend?.label || '0.0%',
+      trendUp: report?.orders_trend?.is_up !== false
     },
     { 
       label: 'Avg. Ticket', 
-      value: formatCurrency(report?.average_ticket || 0, settings), 
+      value: formatCurrency(report?.average_order_value || 0, settings), 
       icon: BarChart3, 
       color: 'text-purple-600', 
       bg: 'bg-purple-100',
-      trend: getTrend('ticket').label,
-      trendUp: getTrend('ticket').up
+      trend: report?.ticket_trend?.label || '0.0%',
+      trendUp: report?.ticket_trend?.is_up !== false
     },
   ];
 
@@ -252,7 +207,7 @@ const Dashboard: React.FC = () => {
                     <div className="w-16 sm:w-24 h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
                       <div 
                         className="h-full bg-blue-600 rounded-full transition-all duration-1000" 
-                        style={{ width: `${(item.revenue / (report?.total_sales || 1)) * 100}%` }}
+                        style={{ width: `${(item.total_sales / (report?.total_sales || 1)) * 100}%` }}
                       ></div>
                     </div>
                   </div>

@@ -22,6 +22,7 @@ const Reports: React.FC = () => {
   const [dateRange, setDateRange] = useState({ start: today, end: today });
   const [report, setReport] = useState<SalesReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [rankBy, setRankBy] = useState<'revenue' | 'sales'>('revenue');
 
   const fetchReport = React.useCallback(async () => {
     setIsLoading(true);
@@ -52,8 +53,8 @@ const Reports: React.FC = () => {
       icon: DollarSign, 
       color: 'text-emerald-600', 
       bg: 'bg-emerald-50',
-      trend: '+12.5%',
-      trendUp: true
+      trend: report?.revenue_trend?.label || '0.0%',
+      trendUp: report?.revenue_trend?.is_up !== false
     },
     { 
       label: 'Total Orders', 
@@ -61,8 +62,8 @@ const Reports: React.FC = () => {
       icon: ShoppingBag, 
       color: 'text-blue-600', 
       bg: 'bg-blue-50',
-      trend: '+5.2%',
-      trendUp: true
+      trend: report?.orders_trend?.label || '0.0%',
+      trendUp: report?.orders_trend?.is_up !== false
     },
     { 
       label: 'Avg. Transaction', 
@@ -70,8 +71,8 @@ const Reports: React.FC = () => {
       icon: BarChart3, 
       color: 'text-violet-600', 
       bg: 'bg-violet-50',
-      trend: '-2.1%',
-      trendUp: false
+      trend: report?.ticket_trend?.label || '0.0%',
+      trendUp: report?.ticket_trend?.is_up !== false
     },
   ];
 
@@ -146,9 +147,28 @@ const Reports: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         {/* Top Products */}
         <div className="lg:col-span-2 bg-white p-6 lg:p-8 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <h3 className="text-lg font-bold text-slate-900">Performance by Product</h3>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Ranked by Revenue</span>
+            <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl w-fit">
+              <button 
+                onClick={() => setRankBy('revenue')}
+                className={cn(
+                  "text-xs font-bold px-3 py-1.5 rounded-lg transition-all",
+                  rankBy === 'revenue' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                )}
+              >
+                Ranked by Revenue
+              </button>
+              <button 
+                onClick={() => setRankBy('sales')}
+                className={cn(
+                  "text-xs font-bold px-3 py-1.5 rounded-lg transition-all",
+                  rankBy === 'sales' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                )}
+              >
+                Ranked by Sales
+              </button>
+            </div>
           </div>
           
           {isLoading ? (
@@ -157,30 +177,37 @@ const Reports: React.FC = () => {
             </div>
           ) : report?.top_products && report.top_products.length > 0 ? (
             <div className="space-y-6">
-              {report.top_products.map((item, i) => (
-                <div key={i} className="flex items-center gap-4 group">
-                  <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center font-bold text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
-                    {i + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-slate-900 truncate leading-tight mb-1">{item.product_name}</p>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                        {item.total_quantity} sales
-                      </span>
+              {[...(report.top_products || [])]
+                .sort((a, b) => rankBy === 'revenue' ? b.total_sales - a.total_sales : b.total_quantity - a.total_quantity)
+                .map((item, i) => {
+                  const maxVal = Math.max(...(report.top_products || []).map(p => rankBy === 'revenue' ? p.total_sales : p.total_quantity), 1);
+                  const currentVal = rankBy === 'revenue' ? item.total_sales : item.total_quantity;
+                  const percentage = (currentVal / maxVal) * 100;
+                  return (
+                    <div key={i} className="flex items-center gap-4 group">
+                      <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center font-bold text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-slate-900 truncate leading-tight mb-1">{item.product_name}</p>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                            {item.total_quantity} sales
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-bold text-slate-900 text-lg">{formatCurrency(item.total_sales || 0, settings)}</p>
+                        <div className="w-24 sm:w-32 h-2 bg-slate-100 rounded-full mt-2 overflow-hidden">
+                          <div 
+                            className="h-full bg-blue-600 rounded-full transition-all duration-1000" 
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="font-bold text-slate-900 text-lg">{formatCurrency(item.total_sales || 0, settings)}</p>
-                    <div className="w-24 sm:w-32 h-2 bg-slate-100 rounded-full mt-2 overflow-hidden">
-                      <div 
-                        className="h-full bg-blue-600 rounded-full transition-all duration-1000" 
-                        style={{ width: `${(item.total_sales / (report?.total_sales || 1)) * 100}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-80 text-slate-400 text-center">

@@ -246,9 +246,10 @@ const Products: React.FC = () => {
         alert('Categories imported successfully!');
         await fetchCategories();
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('CSV Import failed', err);
-      alert('CSV Import failed: ' + (err.response?.data?.message || err.message));
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
+      alert('CSV Import failed: ' + (error.response?.data?.message || error.message));
     } finally {
       setIsUploadingCSV(false);
       e.target.value = '';

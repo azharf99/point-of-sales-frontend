@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Printer } from 'lucide-react';
+import { ReceiptModal } from '../components/ReceiptModal';
 
 export default function PaymentSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get('order_id');
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
@@ -28,13 +31,29 @@ export default function PaymentSuccess() {
           )}
         </div>
 
-        <button
-          onClick={() => navigate('/pos')}
-          className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors focus:ring-4 focus:ring-blue-100"
-        >
-          Return to POS
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={() => setIsReceiptOpen(true)}
+            disabled={!orderId}
+            className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 text-sm border border-slate-200 disabled:opacity-50"
+          >
+            <Printer className="w-4 h-4" />
+            Print Receipt
+          </button>
+          <button
+            onClick={() => navigate('/pos')}
+            className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all active:scale-95 text-sm shadow-lg shadow-blue-100"
+          >
+            Return to POS
+          </button>
+        </div>
       </div>
+
+      <ReceiptModal 
+        isOpen={isReceiptOpen} 
+        onClose={() => setIsReceiptOpen(false)} 
+        transactionIdOrInvoice={orderId || ''} 
+      />
     </div>
   );
 }

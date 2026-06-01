@@ -17,7 +17,8 @@ import {
   Gift,
   Sparkles,
   CheckCircle2,
-  Phone
+  Phone,
+  Printer
 } from 'lucide-react';
 import { productApi } from '../api/products';
 import { transactionApi } from '../api/transactions';
@@ -26,6 +27,7 @@ import type { Product, Category, Customer } from '../types';
 import { cn } from '../utils/cn';
 import { useSettingsStore, formatCurrency } from '../store/settingsStore';
 import { getProductImageUrl } from '../utils/image';
+import { ReceiptModal } from '../components/ReceiptModal';
 
 interface CartItem extends Product {
   quantity: number;
@@ -67,7 +69,8 @@ const POS: React.FC = () => {
   
   // Success state
   const [showSuccess, setShowSuccess] = useState(false);
-  const [successData, setSuccessData] = useState<{ pointsEarned: number; pointsRedeemed: number; total: number } | null>(null);
+  const [successData, setSuccessData] = useState<{ pointsEarned: number; pointsRedeemed: number; total: number; invoiceNumber?: string } | null>(null);
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   
   const searchInputRef = useRef<HTMLInputElement>(null);
   const memberSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -302,7 +305,8 @@ const POS: React.FC = () => {
           setSuccessData({
             pointsEarned: res.data.transaction?.loyalty_points_earned || estimatedPointsEarned,
             pointsRedeemed: redeemPoints,
-            total: res.data.transaction?.total || total
+            total: res.data.transaction?.total || total,
+            invoiceNumber: res.data.transaction?.invoice_number
           });
           setShowSuccess(true);
           setCart([]);
@@ -927,18 +931,33 @@ const POS: React.FC = () => {
               )}
             </div>
 
-            <button
-              onClick={() => {
-                setShowSuccess(false);
-                setSuccessData(null);
-              }}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-blue-150 active:scale-95"
-            >
-              Transaksi Baru
-            </button>
+            <div className="flex gap-3 w-full">
+              <button
+                onClick={() => setIsReceiptOpen(true)}
+                className="flex-1 py-3 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm font-bold rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <Printer className="w-4 h-4" />
+                Cetak Struk
+              </button>
+              <button
+                onClick={() => {
+                  setShowSuccess(false);
+                  setSuccessData(null);
+                }}
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-blue-100 active:scale-95"
+              >
+                Transaksi Baru
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      <ReceiptModal 
+        isOpen={isReceiptOpen} 
+        onClose={() => setIsReceiptOpen(false)} 
+        transactionIdOrInvoice={successData?.invoiceNumber || ''} 
+      />
     </div>
   );
 };

@@ -80,6 +80,12 @@ export interface Transaction {
   created_at: string;
 }
 
+export interface TrendData {
+  percentage: number;
+  is_up: boolean;
+  label: string;
+}
+
 export interface SalesReport {
   total_sales: number;
   total_orders: number;
@@ -98,6 +104,9 @@ export interface SalesReport {
   total_discount: number;
   sales_by_order_type: Record<string, number>;
   item_count_by_order_type: Record<string, number>;
+  revenue_trend?: TrendData;
+  orders_trend?: TrendData;
+  ticket_trend?: TrendData;
 }
 
 export interface StoreSetting {
