@@ -21,6 +21,7 @@ const Customers: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Partial<Customer> | null>(null);
 
@@ -29,17 +30,31 @@ const Customers: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
-  const fetchCustomers = async (page = 1) => {
+  // Debounce search query and reset page to 1 on new search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 300);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchQuery]);
+
+  const fetchCustomers = async (page = 1, search = '') => {
     setIsLoading(true);
     try {
-      const res = await customerApi.getAll(page, 15);
+      const res = await customerApi.getAll(page, 15, search);
       if (res.data && 'items' in res.data) {
         setCustomers(res.data.items || []);
         setCurrentPage(res.data.meta.page);
         setTotalPages(res.data.meta.total_pages);
         setTotalItems(res.data.meta.total);
       } else {
-        setCustomers(Array.isArray(res.data) ? res.data : []);
+        setCustomers([]);
+        setTotalPages(1);
+        setTotalItems(0);
       }
     } catch (err) {
       console.error('Failed to fetch customers', err);
@@ -53,14 +68,14 @@ const Customers: React.FC = () => {
     const load = async () => {
       await Promise.resolve();
       if (active) {
-        fetchCustomers(currentPage);
+        fetchCustomers(currentPage, debouncedSearch);
       }
     };
     load();
     return () => {
       active = false;
     };
-  }, [currentPage]);
+  }, [currentPage, debouncedSearch]);
 
 
 
@@ -101,12 +116,6 @@ const Customers: React.FC = () => {
       console.error('Failed to save customer', err);
     }
   };
-
-  const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.phone.includes(searchQuery) ||
-    c.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <div className="space-y-6 lg:space-y-8 pb-10">
@@ -155,14 +164,14 @@ const Customers: React.FC = () => {
                     <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
                   </td>
                 </tr>
-              ) : filteredCustomers.length === 0 ? (
+              ) : customers.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic">
                     No customers found.
                   </td>
                 </tr>
               ) : (
-                filteredCustomers.map((customer) => (
+                customers.map((customer) => (
                   <tr key={customer.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">

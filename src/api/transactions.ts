@@ -2,8 +2,8 @@ import { api } from './api';
 import type { ApiResponse, Transaction } from '../types';
 
 export const transactionApi = {
-  create: async (data: { customer_id?: number; items: { product_id: number; quantity: number }[]; payment_method: string }) => {
-    const response = await api.post<ApiResponse<Transaction & { payment?: { redirect_url: string } }>>('/transactions', data);
+  create: async (data: { customer_id?: number; items: { product_id: number; quantity: number }[]; payment_method: string; discount?: number; redeem_points?: number }) => {
+    const response = await api.post<ApiResponse<{ transaction: Transaction; payment?: { order_id: string; payment_method: string; amount: number; status: string; redirect_url?: string } }>>('/transactions', data);
     return response.data;
   },
   getById: async (id: number) => {

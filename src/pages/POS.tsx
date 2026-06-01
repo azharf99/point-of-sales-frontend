@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Search, 
   Plus, 
@@ -10,17 +10,27 @@ import {
   Package,
   Loader2,
   X,
-  ShoppingCart
+  ShoppingCart,
+  UserSearch,
+  UserPlus,
+  Trophy,
+  Gift,
+  Sparkles,
+  CheckCircle2,
+  Phone
 } from 'lucide-react';
 import { productApi } from '../api/products';
 import { transactionApi } from '../api/transactions';
-import type { Product, Category } from '../types';
+import { customerApi } from '../api/customers';
+import type { Product, Category, Customer } from '../types';
 import { cn } from '../utils/cn';
 import { useSettingsStore, formatCurrency } from '../store/settingsStore';
 
 interface CartItem extends Product {
   quantity: number;
 }
+
+const POINTS_VALUE = 1000; // 1 point = Rp1,000
 
 const POS: React.FC = () => {
   const { settings, fetchSettings } = useSettingsStore();
@@ -35,7 +45,30 @@ const POS: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'snap'>('cash');
   const [isCartOpen, setIsCartOpen] = useState(false);
   
+  // Member/Customer state
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [memberPhone, setMemberPhone] = useState('');
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const [showMemberSearch, setShowMemberSearch] = useState(false);
+  const [memberSearchResults, setMemberSearchResults] = useState<Customer[]>([]);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [isSearchingMembers, setIsSearchingMembers] = useState(false);
+  
+  // Quick Register state
+  const [showQuickRegister, setShowQuickRegister] = useState(false);
+  const [quickRegName, setQuickRegName] = useState('');
+  const [quickRegPhone, setQuickRegPhone] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  
+  // Redeem Points state
+  const [redeemPoints, setRedeemPoints] = useState(0);
+  
+  // Success state
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successData, setSuccessData] = useState<{ pointsEarned: number; pointsRedeemed: number; total: number } | null>(null);
+  
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const memberSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -66,6 +99,94 @@ const POS: React.FC = () => {
     };
     init();
   }, [settings, fetchSettings]);
+
+  // Debounced member search
+  const searchMembers = useCallback(async (query: string) => {
+    if (!query || query.length < 2) {
+      setMemberSearchResults([]);
+      return;
+    }
+    setIsSearchingMembers(true);
+    try {
+      const res = await customerApi.getAll(1, 10, query);
+      if (res.data && 'items' in res.data) {
+        setMemberSearchResults(res.data.items || []);
+      }
+    } catch (err) {
+      console.error('Member search failed', err);
+    } finally {
+      setIsSearchingMembers(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (memberSearchTimerRef.current) clearTimeout(memberSearchTimerRef.current);
+    memberSearchTimerRef.current = setTimeout(() => {
+      searchMembers(memberSearchQuery);
+    }, 300);
+    return () => {
+      if (memberSearchTimerRef.current) clearTimeout(memberSearchTimerRef.current);
+    };
+  }, [memberSearchQuery, searchMembers]);
+
+  const handleMemberLookup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!memberPhone.trim()) return;
+    
+    setIsLookingUp(true);
+    try {
+      const res = await customerApi.lookup(memberPhone.trim());
+      if (res.success && res.data) {
+        setSelectedCustomer(res.data);
+        setMemberPhone('');
+        setRedeemPoints(0);
+      } else {
+        // Offer quick register
+        setQuickRegPhone(memberPhone.trim());
+        setQuickRegName('');
+        setShowQuickRegister(true);
+      }
+    } catch {
+      // Not found — offer quick register
+      setQuickRegPhone(memberPhone.trim());
+      setQuickRegName('');
+      setShowQuickRegister(true);
+    } finally {
+      setIsLookingUp(false);
+    }
+  };
+
+  const handleQuickRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsRegistering(true);
+    try {
+      const res = await customerApi.create({ name: quickRegName, phone: quickRegPhone });
+      if (res.success && res.data) {
+        setSelectedCustomer(res.data);
+        setShowQuickRegister(false);
+        setMemberPhone('');
+        setRedeemPoints(0);
+      }
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      alert(error?.response?.data?.message || 'Failed to register customer.');
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  const selectMemberFromSearch = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setShowMemberSearch(false);
+    setMemberSearchQuery('');
+    setMemberSearchResults([]);
+    setRedeemPoints(0);
+  };
+
+  const clearCustomer = () => {
+    setSelectedCustomer(null);
+    setRedeemPoints(0);
+  };
 
   const addToCart = (product: Product) => {
     if (product.stock <= 0) {
@@ -124,26 +245,41 @@ const POS: React.FC = () => {
 
   const taxRate = settings ? settings.tax_rate / 100 : 0.1;
   const subtotal = cart.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
-  const tax = subtotal * taxRate;
-  const total = Math.max(0, subtotal + tax - discount);
+  const pointsDiscount = redeemPoints * POINTS_VALUE;
+  const taxableAmount = Math.max(0, subtotal - discount - pointsDiscount);
+  const tax = taxableAmount * taxRate;
+  const total = Math.max(0, subtotal - discount - pointsDiscount + tax);
+  const estimatedPointsEarned = selectedCustomer ? Math.floor(total / 10000) : 0;
+  const maxRedeemablePoints = selectedCustomer ? Math.min(selectedCustomer.points, Math.floor((subtotal - discount) / POINTS_VALUE)) : 0;
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     
     setIsCheckingOut(true);
     try {
-      const checkoutData = {
+      const checkoutData: {
+        payment_method: string;
+        discount: number;
+        redeem_points: number;
+        customer_id?: number;
+        items: { product_id: number; quantity: number }[];
+      } = {
         payment_method: paymentMethod,
         discount: discount,
+        redeem_points: redeemPoints,
         items: cart.map(item => ({
           product_id: item.id,
           quantity: item.quantity
         }))
       };
+
+      if (selectedCustomer) {
+        checkoutData.customer_id = selectedCustomer.id;
+      }
       
       const res = await transactionApi.create(checkoutData);
       
-      if (res.success) {
+      if (res.success && res.data) {
         if (paymentMethod === 'snap' && res.data.payment?.redirect_url) {
           try {
             const url = new URL(res.data.payment.redirect_url);
@@ -159,9 +295,17 @@ const POS: React.FC = () => {
             alert('Error: Invalid payment redirect URL.');
           }
         } else {
-          alert('Transaction successful!');
+          // Cash success
+          setSuccessData({
+            pointsEarned: res.data.transaction?.loyalty_points_earned || estimatedPointsEarned,
+            pointsRedeemed: redeemPoints,
+            total: res.data.transaction?.total || total
+          });
+          setShowSuccess(true);
           setCart([]);
           setDiscount(0);
+          setRedeemPoints(0);
+          setSelectedCustomer(null);
           setIsCartOpen(false);
         }
       }
@@ -185,6 +329,67 @@ const POS: React.FC = () => {
     <div className="flex h-full gap-6 relative">
       {/* Product Catalog Section */}
       <div className="flex-1 flex flex-col min-w-0 h-full">
+        {/* Member Section */}
+        <div className="mb-4 lg:mb-5">
+          {selectedCustomer ? (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3 lg:p-4 flex items-center gap-3 lg:gap-4 animate-in fade-in duration-200">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-lg shrink-0">
+                {selectedCustomer.name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-slate-900 text-sm lg:text-base truncate">{selectedCustomer.name}</h3>
+                <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <Phone className="w-3 h-3" />
+                    {selectedCustomer.phone}
+                  </span>
+                  <span className="flex items-center gap-1 text-amber-600 font-bold">
+                    <Trophy className="w-3 h-3" />
+                    {selectedCustomer.points} pts
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={clearCustomer}
+                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all shrink-0"
+                title="Remove member"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <form onSubmit={handleMemberLookup} className="flex-1 flex gap-2">
+                <div className="relative flex-1">
+                  <UserSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Scan/ketik No. HP member..."
+                    value={memberPhone}
+                    onChange={(e) => setMemberPhone(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLookingUp || !memberPhone.trim()}
+                  className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-slate-300 transition-all text-sm font-bold shrink-0 active:scale-95 flex items-center gap-1.5"
+                >
+                  {isLookingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  Cari
+                </button>
+              </form>
+              <button
+                onClick={() => setShowMemberSearch(true)}
+                className="px-3 py-2.5 border border-slate-200 bg-white rounded-xl hover:bg-slate-50 transition-all text-slate-600 shrink-0"
+                title="Cari member"
+              >
+                <UserPlus className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="mb-4 lg:mb-6 space-y-4">
           <form onSubmit={handleBarcodeLookup} className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -309,6 +514,25 @@ const POS: React.FC = () => {
           </div>
         </div>
 
+        {/* Customer Info in Cart (compact) */}
+        {selectedCustomer && (
+          <div className="px-4 lg:px-6 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100 shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-amber-600" />
+                <span className="text-xs font-bold text-slate-700">{selectedCustomer.name}</span>
+              </div>
+              <span className="text-xs font-bold text-amber-600">{selectedCustomer.points} pts</span>
+            </div>
+            {cart.length > 0 && estimatedPointsEarned > 0 && (
+              <p className="text-[10px] text-emerald-600 mt-1 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" />
+                Akan mendapat +{estimatedPointsEarned} points dari transaksi ini
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-4">
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-4">
@@ -351,17 +575,76 @@ const POS: React.FC = () => {
         </div>
 
         <div className="p-4 lg:p-6 bg-slate-50 border-t border-slate-100 shrink-0">
+          {/* Redeem Points UI */}
+          {selectedCustomer && selectedCustomer.points > 0 && cart.length > 0 && (
+            <div className="mb-4 bg-amber-50/50 border border-amber-100 rounded-xl p-3 animate-in slide-in-from-bottom-2 duration-200">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Gift className="w-4 h-4 text-amber-600 animate-pulse" />
+                  Tukar Points untuk Discount
+                </label>
+                <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-1.5 py-0.5 rounded-md">
+                  1 pt = Rp1.000
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min="0"
+                  max={maxRedeemablePoints}
+                  value={redeemPoints}
+                  onChange={(e) => setRedeemPoints(Number(e.target.value))}
+                  className="flex-1 accent-amber-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                />
+                <div className="flex items-center gap-1 border border-amber-200 bg-white px-2 py-1 rounded-lg shrink-0">
+                  <input
+                    type="number"
+                    min="0"
+                    max={maxRedeemablePoints}
+                    value={redeemPoints}
+                    onChange={(e) => {
+                      const val = Math.min(maxRedeemablePoints, Math.max(0, Number(e.target.value)));
+                      setRedeemPoints(val);
+                    }}
+                    className="w-10 text-center font-bold text-slate-800 text-sm focus:outline-none"
+                  />
+                  <span className="text-xs text-slate-400 font-medium">pts</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center mt-2 text-[10px] text-slate-500 font-medium">
+                <span>Maksimal redeem: {maxRedeemablePoints} pts</span>
+                {redeemPoints > 0 && (
+                  <span className="text-amber-600 font-bold animate-pulse">
+                    Potongan: -{formatCurrency(pointsDiscount, settings)}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2 mb-4 lg:mb-6 text-xs lg:text-sm">
             <div className="flex justify-between text-slate-600">
               <span>Subtotal</span>
               <span className="font-semibold">{formatCurrency(subtotal, settings)}</span>
             </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-red-500">
+                <span>Discount Manual</span>
+                <span className="font-semibold">-{formatCurrency(discount, settings)}</span>
+              </div>
+            )}
+            {redeemPoints > 0 && (
+              <div className="flex justify-between text-amber-600">
+                <span>Point Discount ({redeemPoints} pts)</span>
+                <span className="font-semibold">-{formatCurrency(pointsDiscount, settings)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-slate-600">
               <span>Tax ({settings ? settings.tax_rate : 10}%)</span>
               <span className="font-semibold">{formatCurrency(tax, settings)}</span>
             </div>
             <div className="flex justify-between text-slate-600 items-center">
-              <span>Discount</span>
+              <span>Discount Manual</span>
               <div className="flex items-center gap-1 border-b border-slate-300 focus-within:border-blue-500 transition-colors">
                 <span className="text-[10px] text-slate-400">
                   {settings?.currency === 'IDR' ? 'Rp' : (settings?.currency === 'EUR' ? '€' : (settings?.currency === 'GBP' ? '£' : '$'))}
@@ -433,6 +716,202 @@ const POS: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Member Search Modal */}
+      {showMemberSearch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                <UserSearch className="w-5 h-5 text-blue-600" />
+                Cari Member
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowMemberSearch(false);
+                  setMemberSearchQuery('');
+                  setMemberSearchResults([]);
+                }}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 border-b border-slate-100 shrink-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Ketik nama atau nomor HP member..."
+                  value={memberSearchQuery}
+                  onChange={(e) => setMemberSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-4 min-h-[200px]">
+              {isSearchingMembers ? (
+                <div className="h-full flex items-center justify-center py-10">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                </div>
+              ) : memberSearchResults.length > 0 ? (
+                <div className="space-y-2">
+                  {memberSearchResults.map((customer) => (
+                    <button
+                      key={customer.id}
+                      onClick={() => selectMemberFromSearch(customer)}
+                      className="w-full p-3 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/30 transition-all text-left flex items-center justify-between group"
+                    >
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-sm group-hover:text-blue-600 transition-colors">
+                          {customer.name}
+                        </h4>
+                        <p className="text-xs text-slate-500 mt-0.5">{customer.phone}</p>
+                      </div>
+                      <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg flex items-center gap-1">
+                        <Trophy className="w-3.5 h-3.5" />
+                        {customer.points} pts
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : memberSearchQuery.length >= 2 ? (
+                <div className="text-center py-10 text-slate-400">
+                  <p className="text-sm">Member tidak ditemukan.</p>
+                  <button
+                    onClick={() => {
+                      setQuickRegPhone(memberSearchQuery.replace(/\D/g, ''));
+                      setQuickRegName('');
+                      setShowMemberSearch(false);
+                      setShowQuickRegister(true);
+                    }}
+                    className="mt-3 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1 active:scale-95 transition-all"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    Daftar Baru
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center py-10 text-slate-400 text-xs">
+                  Ketik minimal 2 karakter untuk memulai pencarian.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Register Modal */}
+      {showQuickRegister && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <form onSubmit={handleQuickRegister} className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-blue-600" />
+                Daftar Cepat Member
+              </h3>
+              <button 
+                type="button"
+                onClick={() => setShowQuickRegister(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">No. Handphone</label>
+                <input
+                  type="text"
+                  required
+                  value={quickRegPhone}
+                  onChange={(e) => setQuickRegPhone(e.target.value)}
+                  placeholder="Contoh: 08123456789"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-semibold"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Nama Lengkap</label>
+                <input
+                  type="text"
+                  required
+                  value={quickRegName}
+                  onChange={(e) => setQuickRegName(e.target.value)}
+                  placeholder="Ketik nama customer..."
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-semibold"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-3 justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowQuickRegister(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={isRegistering || !quickRegName.trim() || !quickRegPhone.trim()}
+                className="px-5 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 disabled:bg-slate-300 transition-all flex items-center gap-1.5 active:scale-95 shadow-md shadow-blue-100"
+              >
+                {isRegistering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
+                Daftarkan
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccess && successData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col p-6 items-center text-center">
+            <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle2 className="w-10 h-10" />
+            </div>
+            <h3 className="font-extrabold text-slate-900 text-xl mb-1">Transaksi Berhasil!</h3>
+            <p className="text-xs text-slate-500 mb-6">Pembayaran telah diproses menggunakan Cash</p>
+
+            <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 mb-6 space-y-3">
+              <div className="flex justify-between text-sm text-slate-600">
+                <span>Total Bayar</span>
+                <span className="font-extrabold text-slate-950">{formatCurrency(successData.total, settings)}</span>
+              </div>
+              {successData.pointsRedeemed > 0 && (
+                <div className="flex justify-between text-xs text-amber-600 font-semibold border-t border-slate-200/60 pt-2.5">
+                  <span className="flex items-center gap-1">
+                    <Gift className="w-3.5 h-3.5" />
+                    Points Ditukar
+                  </span>
+                  <span>-{successData.pointsRedeemed} pts</span>
+                </div>
+              )}
+              {successData.pointsEarned > 0 && (
+                <div className="flex justify-between text-xs text-emerald-600 font-semibold border-t border-slate-200/60 pt-2.5">
+                  <span className="flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Points Didapat
+                  </span>
+                  <span>+{successData.pointsEarned} pts</span>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => {
+                setShowSuccess(false);
+                setSuccessData(null);
+              }}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-blue-150 active:scale-95"
+            >
+              Transaksi Baru
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

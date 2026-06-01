@@ -290,13 +290,13 @@ const Dashboard: React.FC = () => {
                     <ShoppingBag className="w-5 h-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-slate-900 truncate leading-tight mb-0.5">Invoice #{tx.id}</p>
+                    <p className="font-bold text-slate-900 truncate leading-tight mb-0.5">Invoice #{tx.invoice_number || tx.id}</p>
                     <p className="text-xs text-slate-500">
                       {new Date(tx.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })} • {tx.payment_method.toUpperCase()}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-bold text-slate-900">{formatCurrency(tx.total_amount, settings)}</p>
+                    <p className="font-bold text-slate-900">{formatCurrency(tx.total, settings)}</p>
                     <span className={cn(
                       "inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full mt-1",
                       tx.payment_status === 'success' ? "bg-emerald-100 text-emerald-700" :

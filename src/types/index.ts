@@ -59,14 +59,20 @@ export interface TransactionItem {
 
 export interface Transaction {
   id: number;
+  invoice_number: string;
   customer_id?: number;
   customer?: Customer;
   user_id: number;
   user?: User;
-  total_amount: number;
+  subtotal: number;
   discount: number;
+  points_redeemed: number;
+  points_discount: number;
+  tax: number;
+  total: number;
   payment_method: 'cash' | 'snap';
   payment_status: 'pending' | 'success' | 'failed';
+  loyalty_points_earned: number;
   items: TransactionItem[];
   created_at: string;
 }
