@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  Search, 
-  Plus, 
-  Minus, 
-  Trash2, 
-  CreditCard, 
-  Banknote, 
+import {
+  Search,
+  Plus,
+  Minus,
+  Trash2,
+  CreditCard,
+  Banknote,
   ShoppingBag,
   Package,
   Loader2,
@@ -58,7 +58,7 @@ const POS: React.FC = () => {
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'snap'>('cash');
   const [isCartOpen, setIsCartOpen] = useState(false);
-  
+
   // Member/Customer state
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [memberPhone, setMemberPhone] = useState('');
@@ -67,22 +67,22 @@ const POS: React.FC = () => {
   const [memberSearchResults, setMemberSearchResults] = useState<Customer[]>([]);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [isSearchingMembers, setIsSearchingMembers] = useState(false);
-  
+
   // Quick Register state
   const [showQuickRegister, setShowQuickRegister] = useState(false);
   const [quickRegName, setQuickRegName] = useState('');
   const [quickRegPhone, setQuickRegPhone] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
-  
+
   // Redeem Points state
   const [redeemPoints, setRedeemPoints] = useState(0);
   const [isRedeemExpanded, setIsRedeemExpanded] = useState(false);
-  
+
   // Success state
   const [showSuccess, setShowSuccess] = useState(false);
   const [successData, setSuccessData] = useState<{ pointsEarned: number; pointsRedeemed: number; total: number; invoiceNumber?: string } | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
-  
+
   const searchInputRef = useRef<HTMLInputElement>(null);
   const memberSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -152,7 +152,7 @@ const POS: React.FC = () => {
   const handleMemberLookup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!memberPhone.trim()) return;
-    
+
     setIsLookingUp(true);
     try {
       const res = await customerApi.lookup(memberPhone.trim());
@@ -217,7 +217,7 @@ const POS: React.FC = () => {
     setCart((prevCart) => {
       const orderType = 'dine_in';
       const existingItemIndex = prevCart.findIndex((item) => item.id === product.id && (item.order_type || 'dine_in') === orderType);
-      
+
       const totalQuantityInCart = prevCart.filter(c => c.id === product.id).reduce((sum, c) => sum + c.quantity, 0);
 
       if (existingItemIndex >= 0) {
@@ -229,10 +229,10 @@ const POS: React.FC = () => {
         newCart[existingItemIndex] = { ...newCart[existingItemIndex], quantity: newCart[existingItemIndex].quantity + 1 };
         return newCart;
       }
-      
+
       if (totalQuantityInCart >= product.stock) {
-          alert(`Cannot add more. Only ${product.stock} units available in stock.`);
-          return prevCart;
+        alert(`Cannot add more. Only ${product.stock} units available in stock.`);
+        return prevCart;
       }
 
       return [...prevCart, { ...product, quantity: 1, order_type: orderType }];
@@ -250,7 +250,7 @@ const POS: React.FC = () => {
           const newQuantity = Math.max(1, item.quantity + delta);
           const totalQuantityInCart = prevCart.filter(c => c.id === productId).reduce((sum, c) => sum + c.quantity, 0);
           const otherQuantity = totalQuantityInCart - item.quantity;
-          
+
           if (newQuantity + otherQuantity > item.stock) {
             alert(`Cannot exceed available stock (${item.stock} units).`);
             return item;
@@ -290,7 +290,7 @@ const POS: React.FC = () => {
   const handleBarcodeLookup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery) return;
-    
+
     try {
       const res = await productApi.lookup(searchQuery);
       if (res.success && res.data) {
@@ -315,7 +315,7 @@ const POS: React.FC = () => {
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
-    
+
     setIsCheckingOut(true);
     try {
       const checkoutData: {
@@ -338,9 +338,9 @@ const POS: React.FC = () => {
       if (selectedCustomer) {
         checkoutData.customer_id = selectedCustomer.id;
       }
-      
+
       const res = await transactionApi.create(checkoutData);
-      
+
       if (res.success && res.data) {
         if (paymentMethod === 'snap' && res.data.payment?.redirect_url) {
           try {
@@ -382,9 +382,9 @@ const POS: React.FC = () => {
   };
 
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         p.barcode.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.barcode.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === null || p.category_id === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -466,14 +466,14 @@ const POS: React.FC = () => {
               className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm lg:text-base"
             />
           </form>
-          
+
           <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar scroll-smooth">
             <button
               onClick={() => setSelectedCategory(null)}
               className={cn(
                 "px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap",
-                selectedCategory === null 
-                  ? "bg-blue-600 text-white shadow-md shadow-blue-100" 
+                selectedCategory === null
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-100"
                   : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
               )}
             >
@@ -485,8 +485,8 @@ const POS: React.FC = () => {
                 onClick={() => setSelectedCategory(cat.id)}
                 className={cn(
                   "px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap",
-                  selectedCategory === cat.id 
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-100" 
+                  selectedCategory === cat.id
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-100"
                     : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
                 )}
               >
@@ -511,10 +511,10 @@ const POS: React.FC = () => {
                 >
                   <div className="aspect-square bg-slate-100 rounded-lg mb-3 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 transition-all overflow-hidden border border-slate-100 shrink-0">
                     {product.thumbnail_url || product.image_url ? (
-                      <img 
-                        src={getProductImageUrl(product.thumbnail_url || product.image_url)} 
-                        alt={product.name} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" 
+                      <img
+                        src={getProductImageUrl(product.thumbnail_url || product.image_url)}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                       />
                     ) : (
                       <Package className="w-8 lg:w-10 h-8 lg:h-10 text-slate-400 group-hover:text-blue-500 transition-colors" />
@@ -544,7 +544,7 @@ const POS: React.FC = () => {
 
       {/* Floating Action Button for Mobile Cart */}
       {cart.length > 0 && (
-        <button 
+        <button
           onClick={() => setIsCartOpen(true)}
           className="lg:hidden fixed bottom-6 right-6 z-30 bg-blue-600 text-white p-4 rounded-full shadow-2xl flex items-center gap-2 animate-bounce-subtle"
         >
@@ -560,7 +560,7 @@ const POS: React.FC = () => {
 
       {/* Mobile Cart Backdrop */}
       {isCartOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-40 bg-slate-900/50 lg:hidden backdrop-blur-sm"
           onClick={() => setIsCartOpen(false)}
         />
@@ -615,51 +615,52 @@ const POS: React.FC = () => {
             cart.map((item) => {
               const currentOrderType = item.order_type || 'dine_in';
               return (
-              <div key={`${item.id}-${currentOrderType}`} className="flex gap-2 lg:gap-3 group">
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-medium text-slate-900 truncate leading-tight mb-0.5">{item.name}</h4>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-blue-600">{formatCurrency(item.price || 0, settings)}</span>
-                    <span className="text-[10px] font-medium text-slate-400">•</span>
-                    <select
-                      value={currentOrderType}
-                      onChange={(e) => {
-                        updateOrderType(item.id, currentOrderType, e.target.value);
-                      }}
-                      className="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 border-none rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-600 cursor-pointer transition-all"
+                <div key={`${item.id}-${currentOrderType}`} className="flex gap-2 lg:gap-3 group">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-medium text-slate-900 truncate leading-tight mb-0.5">{item.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-blue-600">{formatCurrency(item.price || 0, settings)}</span>
+                      <span className="text-[10px] font-medium text-slate-400">•</span>
+                      <select
+                        value={currentOrderType}
+                        onChange={(e) => {
+                          updateOrderType(item.id, currentOrderType, e.target.value);
+                        }}
+                        className="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 border-none rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-600 cursor-pointer transition-all"
+                      >
+                        <option value="dine_in">Dine-In</option>
+                        <option value="take_away">Take Away</option>
+                        <option value="delivery_gojek">Gojek Delivery</option>
+                        <option value="delivery_grab">Grab Delivery</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center bg-slate-100 rounded-lg p-0.5 lg:p-1">
+                      <button
+                        onClick={() => updateQuantity(item.id, currentOrderType, -1)}
+                        className="p-1 hover:bg-white rounded transition-colors"
+                      >
+                        <Minus className="w-3 lg:w-4 h-3 lg:h-4" />
+                      </button>
+                      <span className="w-6 lg:w-8 text-center text-xs lg:text-sm font-bold">{item.quantity}</span>
+                      <button
+                        onClick={() => updateQuantity(item.id, currentOrderType, 1)}
+                        className="p-1 hover:bg-white rounded transition-colors"
+                      >
+                        <Plus className="w-3 lg:w-4 h-3 lg:h-4" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => removeFromCart(item.id, currentOrderType)}
+                      className="p-1.5 lg:p-2 text-slate-400 hover:text-red-500 transition-colors"
                     >
-                      <option value="dine_in">Dine-In</option>
-                      <option value="take_away">Take Away</option>
-                      <option value="delivery_gojek">Gojek Delivery</option>
-                      <option value="delivery_grab">Grab Delivery</option>
-                    </select>
+                      <Trash2 className="w-3.5 lg:w-4 h-3.5 lg:h-4" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <div className="flex items-center bg-slate-100 rounded-lg p-0.5 lg:p-1">
-                    <button
-                      onClick={() => updateQuantity(item.id, currentOrderType, -1)}
-                      className="p-1 hover:bg-white rounded transition-colors"
-                    >
-                      <Minus className="w-3 lg:w-4 h-3 lg:h-4" />
-                    </button>
-                    <span className="w-6 lg:w-8 text-center text-xs lg:text-sm font-bold">{item.quantity}</span>
-                    <button
-                      onClick={() => updateQuantity(item.id, currentOrderType, 1)}
-                      className="p-1 hover:bg-white rounded transition-colors"
-                    >
-                      <Plus className="w-3 lg:w-4 h-3 lg:h-4" />
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => removeFromCart(item.id, currentOrderType)}
-                    className="p-1.5 lg:p-2 text-slate-400 hover:text-red-500 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 lg:w-4 h-3.5 lg:h-4" />
-                  </button>
-                </div>
-              </div>
-            )})
+              )
+            })
           )}
         </div>
 
@@ -667,7 +668,7 @@ const POS: React.FC = () => {
           {/* Redeem Points UI */}
           {selectedCustomer && selectedCustomer.points > 0 && cart.length > 0 && (
             <div className="mb-2 bg-amber-50/50 border border-amber-100 rounded-lg p-2 animate-in slide-in-from-bottom-2 duration-200">
-              <div 
+              <div
                 className="flex items-center justify-between cursor-pointer select-none"
                 onClick={() => setIsRedeemExpanded(!isRedeemExpanded)}
               >
@@ -731,7 +732,7 @@ const POS: React.FC = () => {
             </div>
           )}
 
-          <div className="space-y-1.5 mb-3 text-xs lg:text-sm">
+          <div className="space-y-1.5 mb-3 text-xs">
             <div className="flex justify-between text-slate-600">
               <span>Subtotal</span>
               <span className="font-semibold">{formatCurrency(subtotal, settings)}</span>
@@ -764,7 +765,7 @@ const POS: React.FC = () => {
                 <span className="text-[10px] text-slate-400">
                   {settings?.currency === 'IDR' ? 'Rp' : (settings?.currency === 'EUR' ? '€' : (settings?.currency === 'GBP' ? '£' : '$'))}
                 </span>
-                <input 
+                <input
                   type="number"
                   min="0"
                   max={subtotal}
@@ -782,7 +783,7 @@ const POS: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="flex justify-between text-base lg:text-lg font-bold text-slate-900 pt-2 border-t border-slate-200 mt-1.5">
+            <div className="flex justify-between text-base font-bold text-slate-900 pt-2 border-t border-slate-200 mt-1.5">
               <span>Total</span>
               <span className="text-blue-600">{formatCurrency(total, settings)}</span>
             </div>
@@ -793,32 +794,32 @@ const POS: React.FC = () => {
               onClick={() => setPaymentMethod('cash')}
               className={cn(
                 "flex items-center justify-center gap-1.5 p-2 rounded-lg border-2 transition-all",
-                paymentMethod === 'cash' 
-                  ? "border-blue-600 bg-blue-50 text-blue-600" 
+                paymentMethod === 'cash'
+                  ? "border-blue-600 bg-blue-50 text-blue-600"
                   : "border-slate-200 text-slate-500 hover:border-slate-300"
               )}
             >
               <Banknote className="w-4 lg:w-5 h-4 lg:h-5 shrink-0" />
-              <span className="text-[10px] lg:text-[11px] font-bold uppercase tracking-wider">Cash</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">Cash</span>
             </button>
             <button
               onClick={() => setPaymentMethod('snap')}
               className={cn(
                 "flex items-center justify-center gap-1.5 p-2 rounded-lg border-2 transition-all",
-                paymentMethod === 'snap' 
-                  ? "border-blue-600 bg-blue-50 text-blue-600" 
+                paymentMethod === 'snap'
+                  ? "border-blue-600 bg-blue-50 text-blue-600"
                   : "border-slate-200 text-slate-500 hover:border-slate-300"
               )}
             >
               <CreditCard className="w-4 lg:w-5 h-4 lg:h-5 shrink-0" />
-              <span className="text-[10px] lg:text-[11px] font-bold uppercase tracking-wider">Snap</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">Snap</span>
             </button>
           </div>
 
           <button
             disabled={cart.length === 0 || isCheckingOut}
             onClick={handleCheckout}
-            className="w-full bg-blue-600 text-white font-bold py-2.5 lg:py-3 rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed shadow-md shadow-blue-200 transition-all flex items-center justify-center gap-2 shrink-0 active:scale-95"
+            className="w-full bg-blue-600 text-white font-bold py-2.5 rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed shadow-md shadow-blue-200 transition-all flex items-center justify-center gap-2 shrink-0 active:scale-95"
           >
             {isCheckingOut ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -841,7 +842,7 @@ const POS: React.FC = () => {
                 <UserSearch className="w-5 h-5 text-blue-600" />
                 Cari Member
               </h3>
-              <button 
+              <button
                 onClick={() => {
                   setShowMemberSearch(false);
                   setMemberSearchQuery('');
@@ -926,7 +927,7 @@ const POS: React.FC = () => {
                 <UserPlus className="w-5 h-5 text-blue-600" />
                 Daftar Cepat Member
               </h3>
-              <button 
+              <button
                 type="button"
                 onClick={() => setShowQuickRegister(false)}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
@@ -1037,10 +1038,10 @@ const POS: React.FC = () => {
         </div>
       )}
 
-      <ReceiptModal 
-        isOpen={isReceiptOpen} 
-        onClose={() => setIsReceiptOpen(false)} 
-        transactionIdOrInvoice={successData?.invoiceNumber || ''} 
+      <ReceiptModal
+        isOpen={isReceiptOpen}
+        onClose={() => setIsReceiptOpen(false)}
+        transactionIdOrInvoice={successData?.invoiceNumber || ''}
       />
     </div>
   );
