@@ -42,7 +42,17 @@ const POS: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    const savedCart = localStorage.getItem('pos_cart');
+    if (savedCart) {
+      try {
+        return JSON.parse(savedCart);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [discount, setDiscount] = useState(0);
@@ -105,6 +115,10 @@ const POS: React.FC = () => {
     };
     init();
   }, [settings, fetchSettings]);
+
+  useEffect(() => {
+    localStorage.setItem('pos_cart', JSON.stringify(cart));
+  }, [cart]);
 
   // Debounced member search
   const searchMembers = useCallback(async (query: string) => {
