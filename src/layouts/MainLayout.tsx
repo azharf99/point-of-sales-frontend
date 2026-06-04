@@ -24,30 +24,33 @@ const SidebarContent: React.FC<{
   onNavItemClick: () => void; 
   onLogout: () => void;
   navItems: Array<{ name: string; icon: React.ElementType; path: string }>;
-}> = ({ onNavItemClick, onLogout, navItems }) => (
+  isCollapsed?: boolean;
+}> = ({ onNavItemClick, onLogout, navItems, isCollapsed }) => (
   <>
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-blue-600 flex items-center gap-2">
-        <ShoppingCart className="w-8 h-8" />
-        <span>ProPoint POS</span>
+    <div className={cn("p-6 transition-all duration-300", isCollapsed ? "px-4 flex justify-center" : "")}>
+      <h1 className={cn("font-bold text-blue-600 flex items-center gap-2", isCollapsed ? "text-xl justify-center" : "text-2xl")}>
+        <ShoppingCart className={cn("shrink-0", isCollapsed ? "w-6 h-6" : "w-8 h-8")} />
+        {!isCollapsed && <span>ProPoint POS</span>}
       </h1>
     </div>
 
-    <nav className="flex-1 px-4 py-4 space-y-1">
+    <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto no-scrollbar">
       {navItems.map((item) => (
         <NavLink
           key={item.path}
           to={item.path}
           onClick={onNavItemClick}
+          title={isCollapsed ? item.name : undefined}
           className={({ isActive }) => cn(
-            "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
+            "flex items-center rounded-lg text-sm font-medium transition-colors",
+            isCollapsed ? "justify-center py-3" : "gap-3 px-4 py-3",
             isActive 
               ? "bg-blue-50 text-blue-600" 
               : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
           )}
         >
-          <item.icon className="w-5 h-5" />
-          {item.name}
+          <item.icon className="w-5 h-5 shrink-0" />
+          {!isCollapsed && <span>{item.name}</span>}
         </NavLink>
       ))}
     </nav>
@@ -55,10 +58,14 @@ const SidebarContent: React.FC<{
     <div className="p-4 border-t border-slate-200">
       <button 
         onClick={onLogout}
-        className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+        title={isCollapsed ? "Logout" : undefined}
+        className={cn(
+          "flex items-center rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors w-full",
+          isCollapsed ? "justify-center py-3" : "gap-3 px-4 py-3"
+        )}
       >
-        <LogOut className="w-5 h-5" />
-        Logout
+        <LogOut className="w-5 h-5 shrink-0" />
+        {!isCollapsed && <span>Logout</span>}
       </button>
     </div>
   </>
@@ -69,6 +76,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(true);
 
   const handleLogout = async () => {
     try {
@@ -94,11 +102,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 bg-white border-r border-slate-200 flex-col shrink-0">
+      <aside className={cn(
+        "hidden lg:flex bg-white border-r border-slate-200 flex-col shrink-0 transition-all duration-300 ease-in-out",
+        isDesktopCollapsed ? "w-20" : "w-64"
+      )}>
         <SidebarContent 
           onNavItemClick={() => {}} 
           onLogout={handleLogout} 
           navItems={navItems} 
+          isCollapsed={isDesktopCollapsed}
         />
       </aside>
 
@@ -133,8 +145,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 shrink-0">
           <div className="flex items-center gap-4">
             <button 
-              onClick={() => setIsMobileMenuOpen(true)}
-              className="p-2 -ml-2 text-slate-500 lg:hidden hover:bg-slate-50 rounded-lg"
+              onClick={() => {
+                if (window.innerWidth >= 1024) {
+                  setIsDesktopCollapsed(!isDesktopCollapsed);
+                } else {
+                  setIsMobileMenuOpen(true);
+                }
+              }}
+              className="p-2 -ml-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors"
+              title="Toggle Menu"
             >
               <Menu className="w-6 h-6" />
             </button>
