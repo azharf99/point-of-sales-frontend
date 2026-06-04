@@ -293,7 +293,9 @@ const POS: React.FC = () => {
   const pointsDiscount = redeemPoints * POINTS_VALUE;
   const taxableAmount = Math.max(0, subtotal - discount - pointsDiscount);
   const tax = taxableAmount * taxRate;
-  const total = Math.max(0, subtotal - discount - pointsDiscount + tax);
+  const hasDelivery = cart.some(item => (item.order_type || 'dine_in').includes('delivery'));
+  const shippingFee = hasDelivery ? 25000 : 0;
+  const total = Math.max(0, subtotal - discount - pointsDiscount + tax + shippingFee);
   const estimatedPointsEarned = selectedCustomer ? Math.floor(total / 10000) : 0;
   const maxRedeemablePoints = selectedCustomer ? Math.min(selectedCustomer.points, Math.floor((subtotal - discount) / POINTS_VALUE)) : 0;
 
@@ -736,6 +738,12 @@ const POS: React.FC = () => {
               <span>Tax ({settings ? settings.tax_rate : 10}%)</span>
               <span className="font-semibold">{formatCurrency(tax, settings)}</span>
             </div>
+            {shippingFee > 0 && (
+              <div className="flex justify-between text-slate-600">
+                <span>Shipping Fee</span>
+                <span className="font-semibold">{formatCurrency(shippingFee, settings)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-slate-600 items-center">
               <span>Discount Manual</span>
               <div className="flex items-center gap-1 border-b border-slate-300 focus-within:border-blue-500 transition-colors">
