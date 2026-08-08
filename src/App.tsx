@@ -23,6 +23,8 @@ const PaymentError = lazy(() => import('./pages/PaymentError'));
 import { Loader2 } from 'lucide-react';
 
 import { useSettingsStore } from './store/settingsStore';
+import { startSyncEngine } from './offline/syncEngine';
+import { OfflineIndicator } from './components/OfflineIndicator';
 
 // Loading Component
 const PageLoader = () => (
@@ -106,6 +108,10 @@ function App() {
     initApp();
   }, [setAuth, clearAuth, setInitializing]);
 
+  // Drain any sales left in the outbox by a previous session, then keep
+  // watching for reconnects for the lifetime of the app.
+  useEffect(() => startSyncEngine(), []);
+
   return (
     <Router>
       <Suspense fallback={<PageLoader />}>
@@ -168,6 +174,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
+      <OfflineIndicator />
     </Router>
   );
 }

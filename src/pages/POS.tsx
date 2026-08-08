@@ -22,6 +22,14 @@ import {
 } from 'lucide-react';
 import { productApi } from '../api/products';
 import { transactionApi } from '../api/transactions';
+import { OfflinePaymentUnavailableError, type CheckoutData } from '../offline/checkout';
+import {
+  saveCatalog,
+  saveCategories,
+  getCachedCatalog,
+  getCachedCategories,
+  lookupCachedProduct
+} from '../offline/catalog';
 import { customerApi } from '../api/customers';
 import type { Product, Category, Customer } from '../types';
 import { cn } from '../utils/cn';
@@ -80,7 +88,7 @@ const POS: React.FC = () => {
 
   // Success state
   const [showSuccess, setShowSuccess] = useState(false);
-  const [successData, setSuccessData] = useState<{ pointsEarned: number; pointsRedeemed: number; total: number; invoiceNumber?: string } | null>(null);
+  const [successData, setSuccessData] = useState<{ pointsEarned: number; pointsRedeemed: number; total: number; invoiceNumber?: string; offline?: boolean } | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -93,14 +101,31 @@ const POS: React.FC = () => {
         productApi.getAll(1, 100),
         productApi.getCategories()
       ]);
+      let loaded: Product[] = [];
       if (productsRes.data && 'items' in productsRes.data) {
-        setProducts(productsRes.data.items || []);
+        loaded = productsRes.data.items || [];
       } else {
-        setProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
+        loaded = Array.isArray(productsRes.data) ? productsRes.data : [];
       }
+      setProducts(loaded);
       setCategories(categoriesRes.data || []);
+
+      // Keep a local copy so the till can still ring up sales during an outage.
+      void saveCatalog(loaded);
+      void saveCategories(categoriesRes.data || []);
     } catch (err) {
       console.error('Failed to fetch POS data', err);
+
+      // Fall back to the last catalog this terminal saw. Without this the
+      // cashier faces an empty product grid the moment the link drops.
+      const [cachedProducts, cachedCategories] = await Promise.all([
+        getCachedCatalog(),
+        getCachedCategories()
+      ]);
+      if (cachedProducts.length > 0) {
+        setProducts(cachedProducts);
+        setCategories(cachedCategories);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -298,6 +323,14 @@ const POS: React.FC = () => {
         setSearchQuery('');
       }
     } catch (err) {
+      // The scanner is the fastest way to ring up an item, so it has to keep
+      // working during an outage. Fall back to the cached catalog.
+      const cached = await lookupCachedProduct(searchQuery);
+      if (cached) {
+        addToCart(cached);
+        setSearchQuery('');
+        return;
+      }
       console.error('Product not found', err);
     }
   };
@@ -318,20 +351,18 @@ const POS: React.FC = () => {
 
     setIsCheckingOut(true);
     try {
-      const checkoutData: {
-        payment_method: string;
-        discount: number;
-        redeem_points: number;
-        customer_id?: number;
-        items: { product_id: number; quantity: number; order_type: string }[];
-      } = {
+      const checkoutData: CheckoutData = {
         payment_method: paymentMethod,
         discount: discount,
         redeem_points: redeemPoints,
+        // Carried so an offline sale can be billed at the price the customer
+        // was actually shown, even if the catalog changes during the outage.
+        total: total,
         items: cart.map(item => ({
           product_id: item.id,
           quantity: item.quantity,
-          order_type: item.order_type || 'dine_in'
+          order_type: item.order_type || 'dine_in',
+          unit_price: item.price
         }))
       };
 
@@ -362,7 +393,8 @@ const POS: React.FC = () => {
             pointsEarned: res.data.transaction?.loyalty_points_earned || estimatedPointsEarned,
             pointsRedeemed: redeemPoints,
             total: res.data.transaction?.total || total,
-            invoiceNumber: res.data.transaction?.invoice_number
+            invoiceNumber: res.data.transaction?.invoice_number,
+            offline: res.data.offline === true
           });
           setShowSuccess(true);
           setCart([]);
@@ -374,8 +406,14 @@ const POS: React.FC = () => {
         }
       }
     } catch (err) {
-      console.error('Checkout failed', err);
-      alert('Checkout failed. Please try again.');
+      // A gateway payment cannot be completed without connectivity, so tell the
+      // cashier to switch to cash rather than leaving them stuck at the counter.
+      if (err instanceof OfflinePaymentUnavailableError) {
+        alert(err.message);
+      } else {
+        console.error('Checkout failed', err);
+        alert('Checkout failed. Please try again.');
+      }
     } finally {
       setIsCheckingOut(false);
     }

@@ -1,11 +1,14 @@
 import { api } from './api';
+import { checkout, type CheckoutData } from '../offline/checkout';
 import type { ApiResponse, Transaction } from '../types';
 
 export const transactionApi = {
-  create: async (data: { customer_id?: number; items: { product_id: number; quantity: number }[]; payment_method: string; discount?: number; redeem_points?: number }) => {
-    const response = await api.post<ApiResponse<{ transaction: Transaction; payment?: { order_id: string; payment_method: string; amount: number; status: string; redirect_url?: string } }>>('/transactions', data);
-    return response.data;
-  },
+  /**
+   * Routed through the offline-capable checkout: a cash sale is captured
+   * locally and queued when the server cannot be reached, so the counter keeps
+   * moving during an outage. See src/offline/checkout.ts.
+   */
+  create: (data: CheckoutData) => checkout(data),
   getById: async (id: number) => {
     const response = await api.get<ApiResponse<Transaction>>(`/transactions/${id}`);
     return response.data;
