@@ -116,6 +116,32 @@ export interface StoreSetting {
   currency: string;
   receipt_header: string;
   receipt_footer: string;
+  /** Owner's WhatsApp number for low-stock alerts and scheduled reports. */
+  owner_phone: string;
+  /** Printer character width: 32 for 58mm paper, 48 for 80mm. */
+  receipt_paper_width: number;
+  low_stock_alerts_enabled: boolean;
+  daily_report_enabled: boolean;
+  weekly_report_enabled: boolean;
+  monthly_report_enabled: boolean;
+  /** Local (Asia/Jakarta) hour scheduled reports are sent. */
+  report_hour: number;
   updated_at: string;
+}
+
+/** Stock gap created when an offline sale oversold a product. */
+export interface StockDiscrepancy {
+  id: number;
+  product_id: number;
+  product_name: string;
+  sku: string;
+  transaction_id: number;
+  invoice_number: string;
+  requested_quantity: number;
+  available_stock: number;
+  shortfall: number;
+  reason: string;
+  resolved_at?: string;
+  created_at: string;
 }
 

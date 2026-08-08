@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Printer, X } from 'lucide-react';
+import { Loader2, MessageCircle, Printer, X } from 'lucide-react';
 import { transactionApi } from '../api/transactions';
 import { useSettingsStore, formatCurrency } from '../store/settingsStore';
 import type { Transaction } from '../types';
@@ -15,6 +15,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, tra
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [waStatus, setWaStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [waError, setWaError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!settings) {
@@ -52,6 +54,36 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, tra
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!transaction) return;
+
+    // The server falls back to the customer on file, so only ask when the sale
+    // has no customer attached -- most counter sales do not.
+    let phone = transaction.customer?.phone || '';
+    if (!phone) {
+      const entered = window.prompt('Nomor WhatsApp pelanggan (contoh: 081234567890)');
+      if (!entered) return;
+      phone = entered;
+    }
+
+    setWaStatus('sending');
+    setWaError(null);
+    try {
+      const res = await transactionApi.sendReceiptWhatsApp(transaction.id, phone);
+      if (res.success) {
+        setWaStatus('sent');
+      } else {
+        setWaStatus('error');
+        setWaError(res.message || 'Gagal mengirim struk.');
+      }
+    } catch (err) {
+      setWaStatus('error');
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setWaError(message || 'Gagal mengirim struk. Periksa koneksi WhatsApp gateway.');
+    }
   };
 
   return (
@@ -225,21 +257,46 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, tra
         </div>
 
         {/* Footer Actions (Hidden on Print) */}
-        <div className="px-6 py-4 border-t border-slate-100 flex gap-3 print:hidden shrink-0">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 px-4 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors text-sm active:scale-95"
-          >
-            Close
-          </button>
-          <button
-            onClick={handlePrint}
-            disabled={!transaction}
-            className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors text-sm active:scale-95 shadow-lg shadow-blue-100"
-          >
-            <Printer className="w-4 h-4" />
-            Print Receipt
-          </button>
+        <div className="px-6 py-4 border-t border-slate-100 print:hidden shrink-0 space-y-3">
+          {waStatus === 'sent' && (
+            <p className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+              Struk terkirim via WhatsApp.
+            </p>
+          )}
+          {waStatus === 'error' && waError && (
+            <p className="text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+              {waError}
+            </p>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 px-4 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors text-sm active:scale-95"
+            >
+              Close
+            </button>
+            <button
+              onClick={handleSendWhatsApp}
+              disabled={!transaction || waStatus === 'sending'}
+              className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors text-sm active:scale-95 shadow-lg shadow-emerald-100"
+            >
+              {waStatus === 'sending' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <MessageCircle className="w-4 h-4" />
+              )}
+              WhatsApp
+            </button>
+            <button
+              onClick={handlePrint}
+              disabled={!transaction}
+              className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors text-sm active:scale-95 shadow-lg shadow-blue-100"
+            >
+              <Printer className="w-4 h-4" />
+              Print
+            </button>
+          </div>
         </div>
 
       </div>
